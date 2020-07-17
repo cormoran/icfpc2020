@@ -27,6 +27,10 @@ def umodulate(x: str) -> int:
     return num * signal
 
 
+def modulate_list(x: str):
+    return "11" + xx + "00"
+
+
 def modulate(x: int) -> str:
     res = ""
     # signal
@@ -80,8 +84,8 @@ def test_umodulate():
 def ensure_no_error(response: requests.Response) -> requests.Response:
     if response.status_code != 200:
         print('Unexpected server response:')
-        print('HTTP code:', res.status_code)
-        print('Response body:', res.text)
+        print('HTTP code:', response.status_code)
+        print('Response body:', response.text)
         exit(2)
     return response
 
@@ -91,7 +95,7 @@ def main():
     player_key = sys.argv[2]
     print('ServerUrl: %s; PlayerKey: %s' % (server_url, player_key))
 
-    data = modulate(int(player_key))
+    data = modulate_list(modulate(0))
     print('Send ', data)
     res = ensure_no_error(requests.post(server_url + '/aliens/send',
                                         data=data))
