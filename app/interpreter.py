@@ -75,7 +75,7 @@ class Picture(Node):
         return self
 
     def equal(self, target):
-        raise NotImplementedError()
+        return False
 
 
 @dataclasses.dataclass
@@ -336,7 +336,6 @@ class Ap(Node):
     arg: typing.Optional[Node]
 
     def ap(self, arg):
-        # TODO: evaluate
         return self.evaluate().ap(arg)
 
     # return func or value
@@ -482,13 +481,30 @@ class IsNil(NArgOp):
         return T() if isinstance(n, Nil) else F()
 
 
-# @dataclasses.dataclass
-# class Draw(NArgOp):
-#     n_args = 1
+@dataclasses.dataclass
+class Draw(NArgOp):
+    n_args = 1
 
-#     def _evaluate(self) -> Node:
-#         arg = evaluate_to_type(self.args[0], Cons)
-#         picture = Picture()
+    def _evaluate(self) -> Node:
+        arg = evaluate_to_type(self.args[0], [Cons, Nil])
+        picture = Picture()
+        # TODO: add points
+        return Picture()
+
+
+@dataclasses.dataclass
+class MultipleDraw(NArgOp):
+    n_args = 1
+
+    def _evaluate(self) -> Node:
+        n = evaluate_to_type(self.args[0], [Nil, Cons])
+        if isinstance(n, Nil):
+            return n
+        elif isinstance(n, Cons):
+            return Ap(Ap(Cons(), Ap(Draw(), n.args[0])),
+                      Ap(MultipleDraw(), n.args[1]))
+        else:
+            raise Exception(f"unknown type node {n}")
 
 
 @dataclasses.dataclass
@@ -499,6 +515,100 @@ class If0(NArgOp):
         condition = evaluate_to_type(self.args[0],
                                      Number)  # TODO: 実は number でなくてもよいかも
         return self.args[1 if condition.n == 0 else 2]
+
+
+@dataclasses.dataclass
+class Modem(NArgOp):
+    n_args = 1
+
+    def _evaluate(self) -> Node:
+        return Ap(Demodulate(), Ap(Modulate(), self.args[0]))
+
+
+@dataclasses.dataclass
+class F38(NArgOp):
+    n_args = 2
+
+    # "ap ap f38 x2 x0 = ap ap ap if0 ap car x0 ( ap modem ap car ap cdr x0 , ap multipledraw ap car ap cdr ap cdr x0 ) ap ap ap interact x2 ap modem ap car ap cdr x0 ap send ap car ap cdr ap cdr x0"
+    def _evaluate(self) -> Node:
+        x2 = self.args[0]  # protocol
+        x0 = self.args[1]  # (flag, newState, data)
+        # ( ap modem ap car ap cdr x0 , ap multipledraw ap car ap cdr ap cdr x0 )
+        list1 = Cons([
+            Ap(Modem(), Ap(Car(), Ap(Cdr(), x0))),
+            Ap(MultipleDraw(), Ap(Car(), Ap(Cdr(), Ap(Cdr(), x0)))),
+        ])
+        # yapf: disable
+        a = Ap(Ap(Ap(Interact, x2),
+                  Ap(Modem(), Ap(Car(),
+                                 Ap(Cdr(), x0)))),
+               Ap(Send(),
+                  Ap(Car(),
+                     Ap(Cdr(),
+                        Ap(Cdr(), x0)))))
+
+        return Ap(Ap(Ap(If0(),
+                        Ap(Car(), x0)),
+                     list1),
+                  a)
+        # yapf: enable
+
+
+@dataclasses.dataclass
+class Interact(NArgOp):
+    n_args = 3
+
+    # "ap ap ap interact x2 x4 x3 = ap ap f38 x2 ap ap x2 x4 x3"
+    def _evaluate(self) -> Node:
+        x2 = self.args[0]  # protocol: function (state, vector) -> value
+        x4 = self.args[1]  # state
+        x3 = self.args[2]  # vector
+
+        return Ap(Ap(F38(), x2), Ap(Ap(x2, x4), x3))
+
+
+@dataclasses.dataclass
+class StatelessDraw(NArgOp):
+    n_args = 2
+
+    # ap ap c ap ap b b ap ap b ap b ap cons 0 ap ap c ap ap b b cons ap ap c cons nil ap ap c ap ap b cons ap ap c cons nil nil
+    def _evaluate(self) -> Node:
+        if isinstance(self.args[0], Nil):
+            return make_list(
+                [Number(0),
+                 Nil(),
+                 make_list([make_list([self.args[1]])])])
+        # yapf: disable
+        x = Ap(Ap(C(),
+                  Ap(Ap(B(), B()),
+                     Ap(Ap(B(),
+                           Ap(B(),
+                              Ap(Cons(), Number(0)))),
+                        Ap(Ap(C(), Ap(Ap(B(), B()), Cons())),
+                           Ap(Ap(C(), Cons()), Nil()))))),
+               Ap(Ap(C(),
+                     Ap(Ap(B(), Cons()),
+                        Ap(Ap(C(), Cons()),
+                           Nil()))),
+                  Nil()))
+        # yapf: enable
+        return x
+
+
+@dataclasses.dataclass
+class StatefullDraw(NArgOp):
+    n_args = 2
+
+    def _evaluate(self) -> Node:
+        # ap ap statefulldraw x0 x1 = ( 0 , ap ap cons x1 x0 , ( ap ap cons x1 x0 ) )
+        # statefulldraw = ap ap b ap b ap ap s ap ap b ap b ap cons 0 ap ap c ap ap b b cons ap ap c cons nil ap ap c cons nil ap c cons
+        raise NotImplementedError()
+
+
+def make_list(elements: typing.List):
+    if len(elements) == 0:
+        return Nil()
+    return Cons([elements[0], make_list(elements[1:])])
 
 
 token_node_map = {
@@ -527,8 +637,23 @@ token_node_map = {
     "nil": Nil,
     "isnil": IsNil,
     "vec": Cons,
+    "draw": Draw,
+    "multipledraw": MultipleDraw,
     "if0": If0,
+    "modem": Modem,
+    "f38": F38,
+    "interact": Interact,
+    "statelessdraw": StatelessDraw,
+    "statefulldraw": StatefullDraw,
 }
+
+
+def evaluate_all_ap(node: Node):
+    while isinstance(node, Ap):
+        node = node.evaluate()
+    if isinstance(node, NArgOp):
+        node.args = list(map(evaluate_all_ap, node.args))
+    return node
 
 
 def token_to_node(token: str, var_map) -> Node:
@@ -556,9 +681,7 @@ class Interpreter():
 
     def _evaluate_expression(self, expression_tokens: typing.List[str]):
         root, _ = self._build(0, expression_tokens)
-        while isinstance(root, Ap):
-            root = root.evaluate()
-        return root
+        return evaluate_all_ap(root)
 
     def _build(self, i, tokens):
         if tokens[i] == "ap":
@@ -651,7 +774,17 @@ if __name__ == '__main__':
         ("( )", Nil()),
         ("( 10 )", Cons([Number(10), Nil()])),
         ("( 10 , 11 )", Cons([Number(10),
-                              Ap(Ap(Cons(), Number(11)), Nil())])),
+                              Cons([Number(11), Nil()])])),
+            # 32 Draw
+        ("ap draw ( )", Picture()),
+        ("ap draw ( ap ap vec 1 1 )", Picture()),
+        ("ap draw ( ap ap vec 1 2 )", Picture()),
+        ("ap draw ( ap ap vec 1 5 )", Picture()),
+        ("ap draw ( ap ap vec 1 1 , ap ap vec 3 1 )", Picture()),
+            # 34 Multiple Draw
+        ("ap multipledraw nil", Nil()),
+        ("ap multipledraw ap ap cons ap ap vec 1 1 ap ap cons ap ap vec 2 2 nil",
+         make_list([Picture(), Picture()])),
             # 35 Modulate List
         ("ap mod nil", Modulated("00")),
         ("ap mod ap ap cons nil nil", Modulated("110000")),
@@ -666,7 +799,27 @@ if __name__ == '__main__':
             # ("ap send ( 0 )", Cons([Number(1), Cons([Number(0), Nil()])])),
             # 37 Is 0
         ("ap ap ap if0 0 10 11", Number(10)),
-        ("ap ap ap if0 1 10 11", Number(11))
+        ("ap ap ap if0 1 10 11", Number(11)),
+            # 38 Interact
+        ("ap modem 10", Number(10)),
+            # "ap ap f38 x2 x0 = ap ap ap if0 ap car x0 ( ap modem ap car ap cdr x0 , ap multipledraw ap car ap cdr ap cdr x0 ) ap ap ap interact x2 ap modem ap car ap cdr x0 ap send ap car ap cdr ap cdr x0"
+            # "ap ap ap interact x2 x4 x3 = ap ap f38 x2 ap ap x2 x4 x3"
+            # 39 Interaction Protocol
+            # ("ap ap ap interact x0 nil ap ap vec 0 0", Nil()), # TODO: x0 need to be function
+        ("ap ap statelessdraw nil 10",
+         make_list([Number(0),
+                    Nil(),
+                    make_list([make_list([Number(10)])])])),
+            # 40 Stateless Drawing Protocol
+            # TODO: ( nil , ( [1,0] ) ) になってほしいけど ( ) が少ない気がする...
+        ("ap ap ap interact statelessdraw nil ap ap vec 1 0",
+         make_list([Nil(), Picture()])),
+            # 41 Statefull Drawing Protocol
+            # ap ap ap interact statefulldraw nil ap ap vec 0 0 = ( ( ap ap vec 0 0 ) , ( [0,0] ) )
+            # ap ap ap interact statefulldraw ( ap ap vec 0 0 ) ap ap vec 2 3 = ( x2 , ( [0,0;2,3] ) )
+            # ap ap ap interact statefulldraw x2 ap ap vec 1 2 = ( x3 , ( [0,0;2,3;1,2] ) )
+            # ap ap ap interact statefulldraw x3 ap ap vec 3 2 = ( x4 , ( [0,0;2,3;1,2;3,2] ) )
+            # ap ap ap interact statefulldraw x4 ap ap vec 4 0 = ( x5 , ( [0,0;2,3;1,2;3,2;4,0] ) )
     ]):
         try:
             val = interpreter.evaluate_expression(test_case[0])
@@ -676,6 +829,6 @@ if __name__ == '__main__':
                 )
         except Exception as e:
             print(f"case {i}: `{test_case[0]}` exception {e}")
-            # print(traceback.format_exc())
+            print(traceback.format_exc())
 
     print("test finished!")
