@@ -28,7 +28,7 @@ def umodulate(x: str) -> int:
 
 
 def modulate_list(x: str):
-    return "11" + xx + "00"
+    return "11" + x + "00"
 
 
 def modulate(x: int) -> str:
