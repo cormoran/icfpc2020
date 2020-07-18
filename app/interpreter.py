@@ -514,7 +514,7 @@ class Interpreter():
 
     def _evaluate_expression(self, expression_tokens: typing.List[str]):
         root, _ = self._build(0, expression_tokens)
-        return evaluate_all(root)
+        return root.evaluate()
 
     def _build(self, i, tokens):
         if tokens[i] == "ap":
@@ -535,6 +535,7 @@ class Interpreter():
         else:
             return token_to_node(tokens[i], self.var_dict), i + 1
 
+    # (1, 2, ...) -> ap ap cons 1 ap ap cons 2, ..., nil
     def _build_list(self, i, elements):
         if i == len(elements):
             return Nil()
