@@ -24,9 +24,6 @@ class Node:
     def equal(self, target):
         return False
 
-    def is_leaf(self):
-        return True
-
 
 def ensure_type(node: Node, t: typing.ClassVar) -> Node:
     if not isinstance(node, t):
@@ -129,9 +126,6 @@ class NArgOp(Node):
             if not a.equal(b):
                 return False
         return True
-
-    def is_leaf(self):
-        return False
 
 
 @dataclasses.dataclass
@@ -309,9 +303,6 @@ class Ap(Node):
     def evaluate(self) -> Node:
         return self.func.ap(self.arg)
 
-    def is_leaf(self):
-        return False
-
 
 @dataclasses.dataclass
 class S(NArgOp):
@@ -321,7 +312,7 @@ class S(NArgOp):
         # TODO: 知らんぞ
         a = Ap(self.args[0], self.args[2])
         b = Ap(self.args[1], self.args[2])
-        return Ap(a, b)
+        return Ap(a, b).evaluate()
 
 
 @dataclasses.dataclass
@@ -357,9 +348,6 @@ class T(NArgOp):
             return True
         return super().equal(target)
 
-    def is_leaf(self):
-        return len(self.args) == 0
-
 
 @dataclasses.dataclass
 class F(NArgOp):
@@ -373,9 +361,6 @@ class F(NArgOp):
                 target.args) == 0:
             return True
         return super().equal(target)
-
-    def is_leaf(self):
-        return len(self.args) == 0
 
 
 @dataclasses.dataclass
@@ -438,9 +423,6 @@ class Nil(NArgOp):
                 target.args) == 0:
             return True
         return super().equal(target)
-
-    def is_leaf(self):
-        return len(self.args) == 0
 
 
 @dataclasses.dataclass
@@ -540,12 +522,6 @@ class Interpreter():
         if i == len(elements):
             return Nil()
         return Ap(Ap(Cons(), elements[i]), self._build_list(i + 1, elements))
-
-
-def evaluate_all(node: Node):
-    while not node.is_leaf():
-        node = node.evaluate()
-    return node
 
 
 if __name__ == '__main__':
