@@ -346,6 +346,80 @@ class F(NArgOp):
         return len(self.args) == 0
 
 
+@dataclasses.dataclass
+class Pwr2(NArgOp):
+    n_args = 1
+
+    def _evaluate(self) -> Node:
+        n = ensure_type(self.args[0].evaluate(), Number)
+        return Number(2**n.n)
+
+
+@dataclasses.dataclass
+class I(NArgOp):
+    n_args = 1
+
+    def _evaluate(self) -> Node:
+        return self.args[0]  # TODO: evaluate or not
+
+
+@dataclasses.dataclass
+class Cons(NArgOp):
+    n_args = 3
+
+    def _evaluate(self) -> Node:
+        a = Ap(self.args[2], self.args[0])
+        return Ap(a, self.args[1]).evaluate()
+
+
+@dataclasses.dataclass
+class Car(NArgOp):
+    n_args = 1
+
+    def _evaluate(self) -> Node:
+        assert isinstance(self.args[0], Cons)
+        assert len(self.args[0].args) <= 2
+        return self.args[0].args[0]  # TODO: evaluate?
+
+
+@dataclasses.dataclass
+class Cdr(NArgOp):
+    n_args = 1
+
+    def _evaluate(self) -> Node:
+        assert isinstance(self.args[0], Cons)
+        assert len(self.args[0].args) == 2
+        return self.args[0].args[1]  # TODO: evaluate?
+
+
+@dataclasses.dataclass
+class Nil(NArgOp):
+    n_args = 1
+
+    def _evaluate(self) -> Node:
+        if len(self.args) == 0:
+            return self
+        return T()
+
+    def equal(self, target):
+        if isinstance(target, Nil) and len(self.args) == 0 and len(
+                target.args) == 0:
+            return True
+        return super().equal(target)
+
+    def is_leaf(self):
+        return len(self.args) == 0
+
+
+@dataclasses.dataclass
+class IsNil(NArgOp):
+    n_args = 1
+
+    def _evaluate(self) -> Node:
+        n = self.args[0].evaluate()
+        return T() if isinstance(n, Nil) else F()
+
+
 token_node_map = {
     "inc": Inc,
     "dec": Dec,
@@ -364,6 +438,13 @@ token_node_map = {
     "b": B,
     "t": T,
     "f": F,
+    "pwr2": Pwr2,
+    "i": I,
+    "cons": Cons,
+    "car": Car,
+    "cdr": Cdr,
+    "nil": Nil,
+    "isnil": IsNil,
 }
 
 
@@ -399,13 +480,24 @@ class Interpreter():
             func, i = self._build(i + 1, tokens)
             arg, i = self._build(i, tokens)
             return Ap(func, arg), i
+        elif tokens[i] == "(":
+            if tokens[i + 1] == ")":
+                return Nil(), i + 1
+            elem, i = self._build(i + 1, tokens)
+            elements = [elem]
+            while tokens[i] == ",":
+                elem, i = self._build(i + 1, tokens)
+                elements.append(elem)
+            assert tokens[i + 1] == ")"
+
+            return self._build_list(0, elements), i + 1
         else:
             return token_to_node(tokens[i], self.var_dict), i + 1
 
-
-class AbstractSyntaxTree():
-    def __init__(self, tokens):
-        self.root = Node(None, None)
+    def _build_list(self, i, elements):
+        if i == len(elements):
+            return Nil()
+        return Ap(Ap(Cons(), elements[i], self._build_list(i + 1, elements)))
 
 
 def evaluate_all(node: Node):
@@ -462,6 +554,14 @@ if __name__ == '__main__':
         ("ap ap t ap inc 5 t", Number(6)),
         ("ap ap f 1 2", Number(2)),
             # ("ap s t", F()),# TODO:
+        ("ap pwr2 2", Number(4)),
+        ("ap pwr2 3", Number(8)),
+        ("ap pwr2 4", Number(16)),
+            # TODO:
+        ("ap nil 10", T()),
+            # ("ap isnil nil", T()), # TODO:
+        ("ap isnil ap ap cons 10 11", F()),
+        ("( )", Nil()),
     ]):
         try:
             val = interpreter.evaluate_expression(test_case[0])
