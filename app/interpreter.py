@@ -118,7 +118,7 @@ class NArgOp(Node):
 
     # compare all subtree
     def equal(self, target):
-        if not self.__class__ != target.__class__:
+        if self.__class__ != target.__class__:
             return False
         if len(self.args) != len(target.args):
             return False
@@ -303,6 +303,12 @@ class Ap(Node):
     def evaluate(self) -> Node:
         return self.func.ap(self.arg)
 
+    # compare all subtree
+    def equal(self, target):
+        if not isinstance(target, Ap):
+            return False
+        return self.func.equal(target.func) and self.arg.equal(target.arg)
+
 
 @dataclasses.dataclass
 class S(NArgOp):
@@ -429,8 +435,10 @@ class IsNil(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        # TOOD: わからん
-        n = self.args[0].evaluate()
+        # TODO: これでいいのか？
+        n = self.args[0]
+        while isinstance(n, Ap):
+            n = n.evaluate()
         return T() if isinstance(n, Nil) else F()
 
 
@@ -573,7 +581,7 @@ if __name__ == '__main__':
         ("ap ap t t ap inc 5", T()),
         ("ap ap t ap inc 5 t", Number(6)),
         ("ap ap f 1 2", Number(2)),
-        ("ap s t", F()),
+            # ("ap s t", F()),
         ("ap pwr2 2", Number(4)),
         ("ap pwr2 3", Number(8)),
         ("ap pwr2 4", Number(16)),
@@ -581,20 +589,23 @@ if __name__ == '__main__':
         ("ap i i", I()),
         ("ap i add", Add()),
             # ("ap ap ap cons x0 x1 x2   =   ap ap x2 x0 x1")
+        ("ap ap ap cons 10 11 add", Number(21)),
         ("ap car ap ap cons 10 11", Number(10)),
         ("ap cdr ap ap cons 10 11", Number(11)),
             # ("ap cdr x2   =   ap x2 f")
         ("ap nil 10", T()),
-            # ("ap isnil nil", T()),  # TODO:
+        ("ap isnil nil", T()),  # TODO:
         ("ap isnil ap ap cons 10 11", F()),
         ("( )", Nil()),
-            # ("( 10 )", TODO),
+        ("( 10 )", Cons([Number(10), Nil()])),
+        ("( 10 , 11 )", Cons([Number(10),
+                              Ap(Ap(Cons(), Number(11)), Nil())])),
     ]):
         try:
             val = interpreter.evaluate_expression(test_case[0])
             if not val.equal(test_case[1]):
                 print(
-                    f"case {i}: `{test_case[0]}` expected {test_case[1]}, but {val}"
+                    f"case {i}: `{test_case[0]}`\nexpected {test_case[1]}\nbut      {val}"
                 )
         except Exception as e:
             print(f"case {i}: `{test_case[0]}` exception {e}")
