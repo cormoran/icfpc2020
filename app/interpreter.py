@@ -3,8 +3,10 @@ import dataclasses
 import math
 import requests
 import traceback
+import os
 
-server_url = ""
+server_url = "https://icfpc2020-api.testkontur.ru"
+query_param = "?apiKey=" + os.environ.get("API_KEY")
 
 
 @dataclasses.dataclass
@@ -20,11 +22,10 @@ class Node:
 
     # compare all subtree
     def equal(self, target):
-        if not self.__class__ != target.__class__:
-            return False
-        if isinstance(self, Ap):
-            return self.func.equal(target.func) and self.arg.equal(target.arg)
         return False
+
+    def is_leaf(self):
+        return True
 
 
 def ensure_type(node: Node, t: typing.ClassVar) -> Node:
@@ -56,15 +57,15 @@ class ModulatedNumber(Node):
         return isinstance(target, ModulatedNumber) and target.n == self.n
 
 
-@dataclasses.dataclass
-class Boolean(Node):
-    b: bool
+# @dataclasses.dataclass
+# class Boolean(Node):
+#     b: bool
 
-    def evaluate(self) -> Node:
-        return self
+#     def evaluate(self) -> Node:
+#         return self
 
-    def equal(self, target):
-        return isinstance(target, Boolean) and target.b == self.b
+#     def equal(self, target):
+#         return isinstance(target, Boolean) and target.b == self.b
 
 
 @dataclasses.dataclass
@@ -85,6 +86,20 @@ class NArgOp(Node):
 
     def _evaluate(self) -> Node:
         raise NotImplementedError()
+
+    # compare all subtree
+    def equal(self, target):
+        if not self.__class__ != target.__class__:
+            return False
+        if len(self.args) != len(target.args):
+            return False
+        for a, b in zip(self.args, target.args):
+            if not a.equal(b):
+                return False
+        return True
+
+    def is_leaf(self):
+        return False
 
 
 @dataclasses.dataclass
@@ -144,7 +159,7 @@ class Eq(NArgOp):
         # TODO: 評価しなくても、subtree が同じ形ならよさそう
         n1 = self.args[0].evaluate()
         n2 = self.args[1].evaluate()
-        return Boolean(n1.equal(n2))
+        return T() if n1.equal(n2) else F()
 
 
 @dataclasses.dataclass
@@ -154,7 +169,7 @@ class Lt(NArgOp):
     def _evaluate(self) -> Node:
         n1 = ensure_type(self.args[0].evaluate(), Number)
         n2 = ensure_type(self.args[1].evaluate(), Number)
-        return Boolean(n1.n < n2.n)
+        return T() if n1.n < n2.n else F()
 
 
 @dataclasses.dataclass
@@ -262,6 +277,74 @@ class Ap(Node):
     def evaluate(self) -> Node:
         return self.func.ap(self.arg)
 
+    def is_leaf(self):
+        return False
+
+
+@dataclasses.dataclass
+class S(NArgOp):
+    n_args = 3
+
+    def _evaluate(self) -> Node:
+        # TODO: 知らんぞ
+        a = Ap(self.args[0], self.args[2])
+        b = Ap(self.args[1], self.args[2])
+        return Ap(a, b).evaluate()
+
+
+@dataclasses.dataclass
+class C(NArgOp):
+    n_args = 3
+
+    def _evaluate(self) -> Node:
+        # TODO: 知らんぞ
+        a = Ap(self.args[0], self.args[2])
+        return Ap(a, self.args[1]).evaluate()
+
+
+@dataclasses.dataclass
+class B(NArgOp):
+    n_args = 3
+
+    def _evaluate(self) -> Node:
+        # TODO: 知らんぞ
+        a = Ap(self.args[1], self.args[2])
+        return Ap(self.args[0], a).evaluate()
+
+
+@dataclasses.dataclass
+class T(NArgOp):
+    n_args = 2
+
+    def _evaluate(self) -> Node:
+        return self.args[0].evaluate()
+
+    def equal(self, target):
+        if isinstance(target, T) and len(self.args) == 0 and len(
+                target.args) == 0:
+            return True
+        return super().equal(target)
+
+    def is_leaf(self):
+        return len(self.args) == 0
+
+
+@dataclasses.dataclass
+class F(NArgOp):
+    n_args = 2
+
+    def _evaluate(self) -> Node:
+        return self.args[1].evaluate()
+
+    def equal(self, target):
+        if isinstance(target, F) and len(self.args) == 0 and len(
+                target.args) == 0:
+            return True
+        return super().equal(target)
+
+    def is_leaf(self):
+        return len(self.args) == 0
+
 
 token_node_map = {
     "inc": Inc,
@@ -276,6 +359,11 @@ token_node_map = {
     "send": Send,
     "neg": Neg,
     #"ap": Ap,
+    "s": S,
+    "c": C,
+    "b": B,
+    "t": T,
+    "f": F,
 }
 
 
@@ -284,10 +372,6 @@ def token_to_node(token: str, var_map) -> Node:
         return token_node_map[token]()
     if token in var_map:
         return var_map[token]
-    if token == "t":
-        return Boolean(True)
-    if token == "f":
-        return Boolean(False)
     return Number(int(token))
 
 
@@ -325,7 +409,7 @@ class AbstractSyntaxTree():
 
 
 def evaluate_all(node: Node):
-    while isinstance(node, (Ap, NArgOp)):
+    while not node.is_leaf():
         node = node.evaluate()
     return node
 
@@ -349,11 +433,11 @@ if __name__ == '__main__':
         ("ap ap div 5 -3", Number(-1)),
         ("ap ap div -5 3", Number(-1)),
         ("ap ap div -5 -3", Number(1)),
-        ("ap ap eq 0 -2", Boolean(False)),
-        ("ap ap eq 0 0", Boolean(True)),
-        ("ap ap lt 0 -1", Boolean(False)),
-        ("ap ap lt 0 0", Boolean(False)),
-        ("ap ap lt 0 1", Boolean(True)),
+        ("ap ap eq 0 -2", F()),
+        ("ap ap eq 0 0", T()),
+        ("ap ap lt 0 -1", F()),
+        ("ap ap lt 0 0", F()),
+        ("ap ap lt 0 1", T()),
         ("ap mod 0", ModulatedNumber("010")),
         ("ap mod 1", ModulatedNumber("01100001")),
         ("ap mod -1", ModulatedNumber("10100001")),
@@ -368,6 +452,16 @@ if __name__ == '__main__':
         ("ap dem ap mod 0", Number(0)),
         ("ap dem ap mod 12341234", Number(12341234)),
         ("ap dem ap mod -12341234", Number(-12341234)),
+        ("ap ap ap s add inc 1", Number(3)),
+        ("ap ap ap s mul ap add 1 6", Number(42)),
+        ("ap ap ap c add 1 2", Number(3)),
+        ("ap ap ap b inc dec 10", Number(10)),
+        ("ap ap t 1 5", Number(1)),
+            # ("ap ap t t i", T()), # TODO:
+            # ("ap ap t t ap inc 5", T()), # TODO:
+        ("ap ap t ap inc 5 t", Number(6)),
+        ("ap ap f 1 2", Number(2)),
+            # ("ap s t", F()),# TODO:
     ]):
         try:
             val = interpreter.evaluate_expression(test_case[0])
@@ -378,4 +472,5 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"case {i}: `{test_case[0]}` exception {e}")
             print(traceback.format_exc())
+
     print("test finished!")
