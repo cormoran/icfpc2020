@@ -312,7 +312,7 @@ class S(NArgOp):
         # TODO: 知らんぞ
         a = Ap(self.args[0], self.args[2])
         b = Ap(self.args[1], self.args[2])
-        return Ap(a, b).evaluate()
+        return Ap(a, b)
 
 
 @dataclasses.dataclass
@@ -320,7 +320,6 @@ class C(NArgOp):
     n_args = 3
 
     def _evaluate(self) -> Node:
-        # TODO: 知らんぞ
         a = Ap(self.args[0], self.args[2])
         return Ap(a, self.args[1])
 
@@ -430,6 +429,7 @@ class IsNil(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
+        # TOOD: わからん
         n = self.args[0].evaluate()
         return T() if isinstance(n, Nil) else F()
 
@@ -496,7 +496,9 @@ class Interpreter():
 
     def _evaluate_expression(self, expression_tokens: typing.List[str]):
         root, _ = self._build(0, expression_tokens)
-        return root.evaluate()
+        while isinstance(root, Ap):
+            root = root.evaluate()
+        return root
 
     def _build(self, i, tokens):
         if tokens[i] == "ap":
@@ -567,23 +569,23 @@ if __name__ == '__main__':
         ("ap ap ap c add 1 2", Number(3)),
         ("ap ap ap b inc dec 10", Number(10)),
         ("ap ap t 1 5", Number(1)),
-            # ("ap ap t t i", T()), # TODO:
-            # ("ap ap t t ap inc 5", T()), # TODO:
+        ("ap ap t t i", T()),
+        ("ap ap t t ap inc 5", T()),
         ("ap ap t ap inc 5 t", Number(6)),
         ("ap ap f 1 2", Number(2)),
-            # ("ap s t", F()),# TODO:
+        ("ap s t", F()),
         ("ap pwr2 2", Number(4)),
         ("ap pwr2 3", Number(8)),
         ("ap pwr2 4", Number(16)),
         ("ap i 10", Number(10)),
-            # ("ap i i", I()),
-            # ("ap i add", Add()),
+        ("ap i i", I()),
+        ("ap i add", Add()),
             # ("ap ap ap cons x0 x1 x2   =   ap ap x2 x0 x1")
         ("ap car ap ap cons 10 11", Number(10)),
         ("ap cdr ap ap cons 10 11", Number(11)),
             # ("ap cdr x2   =   ap x2 f")
         ("ap nil 10", T()),
-            # ("ap isnil nil", T()), # TODO:
+            # ("ap isnil nil", T()),  # TODO:
         ("ap isnil ap ap cons 10 11", F()),
         ("( )", Nil()),
             # ("( 10 )", TODO),
