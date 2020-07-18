@@ -33,7 +33,10 @@ def ensure_type(node: Node, t: typing.ClassVar) -> Node:
 
 
 # evaluate `node` until it's type become `t`
-def evaluate_to_type(node: Node, t: typing.ClassVar) -> Node:
+def evaluate_to_type(node: Node, t: typing.Union[type,
+                                                 typing.List[type]]) -> Node:
+    if isinstance(t, list):
+        t = tuple(t)
     prev = None
     now = node
     while not isinstance(now, t):
@@ -76,14 +79,14 @@ class Picture(Node):
 
 
 @dataclasses.dataclass
-class ModulatedNumber(Node):
+class Modulated(Node):
     n: str
 
     def evaluate(self) -> Node:
         return self
 
     def equal(self, target):
-        return isinstance(target, ModulatedNumber) and target.n == self.n
+        return isinstance(target, Modulated) and target.n == self.n
 
 
 # @dataclasses.dataclass
@@ -202,10 +205,25 @@ class Modulate(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        n = evaluate_to_type(self.args[0], Number)
-        return ModulatedNumber(self.modulate(n.n))
+        n = evaluate_to_type(self.args[0], [Number, Cons, Nil])
+        return Modulated(self._modulate_node(n))
 
-    def modulate(self, x: int) -> str:
+    def _modulate_node(self, node: Node):
+        if isinstance(node, Number):
+            return self.modulate_number(node.n)
+        elif isinstance(node, Nil):
+            return "00"
+        elif isinstance(node, Cons):
+            return self._evaluate_cons(node)
+        else:
+            raise Exception(f"modulate: unsupported Node {node}")
+
+    def _evaluate_cons(self, cons: Node):
+        n1 = evaluate_to_type(cons.args[0], [Number, Cons, Nil])
+        n2 = evaluate_to_type(cons.args[1], [Number, Cons, Nil])
+        return "11" + self._modulate_node(n1) + self._modulate_node(n2)
+
+    def modulate_number(self, x: int) -> str:
         res = ""
         # signal
         if x >= 0:
@@ -221,7 +239,6 @@ class Modulate(NArgOp):
         for i in range(bit_length // 4):
             res += "1"
         res += "0"
-
         # number
         res2 = ""
         while x > 0:
@@ -238,10 +255,29 @@ class Demodulate(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        n = evaluate_to_type(self.args[0], ModulatedNumber)
-        return Number(self.demodulate(n.n))
+        n = evaluate_to_type(self.args[0], Modulated)
+        node, left = self._demodulate(n.n)
+        if len(left) != 0:
+            print(left)
+            assert len(left) == 0
+        return node
 
-    def demodulate(self, x: str) -> int:
+    def _demodulate(self, x: str) -> Node:
+        xx = x
+        if xx.startswith("11"):
+            xx = xx[2:]
+            a, xx = self._demodulate(xx)
+            b, xx = self._demodulate(xx)
+            return Cons([a, b]), xx
+        elif xx.startswith("00"):
+            xx = xx[2:]
+            return Nil(), xx
+        else:
+            n, xx = self.demodulate_number(xx)
+            return Number(n), xx
+
+    # -> number, left str
+    def demodulate_number(self, x: str) -> typing.Tuple[int, str]:
         signal = None
         if x.startswith("01"):
             signal = 1
@@ -256,13 +292,15 @@ class Demodulate(NArgOp):
             x = x[1:]
             bit_length += 1
         x = x[1:]
-
+        bit_length *= 4
+        left = x[bit_length:]
+        x = x[:bit_length]
         x = x[::-1]
         num = 0
         for i in range(len(x)):
             if x[i] == "1":
                 num += 2**i
-        return num * signal
+        return num * signal, left
 
 
 @dataclasses.dataclass
@@ -271,14 +309,16 @@ class Send(NArgOp):
 
     def _evaluate(self) -> Node:
         n = Ap(Modulate(), self.args[0])
-        n = evaluate_to_type(n, ModulatedNumber)
-        res = requests.post(server_url + '/alians/send', n.n)
+        n = evaluate_to_type(n, Modulated)
+        print('* [Human -> Alien]', n.n)
+        res = requests.post(server_url + '/aliens/send' + query_param, n.n)
         if res.status_code != 200:
             print('Unexpected server response:')
             print('HTTP code:', res.status_code)
             print('Response body:', res.text)
             raise Exception('Unexpected server response:')
-        return ensure_type(Ap(Demodulate(), ModulatedNumber(res.text)), Number)
+        print('* [Alien -> Human]', res.text)
+        return Ap(Demodulate(), Modulated(res.text)).evaluate()
 
 
 @dataclasses.dataclass
@@ -450,6 +490,17 @@ class IsNil(NArgOp):
 #         arg = evaluate_to_type(self.args[0], Cons)
 #         picture = Picture()
 
+
+@dataclasses.dataclass
+class If0(NArgOp):
+    n_args = 3
+
+    def _evaluate(self) -> Node:
+        condition = evaluate_to_type(self.args[0],
+                                     Number)  # TODO: 実は number でなくてもよいかも
+        return self.args[1 if condition.n == 0 else 2]
+
+
 token_node_map = {
     "inc": Inc,
     "dec": Dec,
@@ -476,6 +527,7 @@ token_node_map = {
     "nil": Nil,
     "isnil": IsNil,
     "vec": Cons,
+    "if0": If0,
 }
 
 
@@ -558,17 +610,17 @@ if __name__ == '__main__':
         ("ap ap lt 0 -1", F()),
         ("ap ap lt 0 0", F()),
         ("ap ap lt 0 1", T()),
-        ("ap mod 0", ModulatedNumber("010")),
-        ("ap mod 1", ModulatedNumber("01100001")),
-        ("ap mod -1", ModulatedNumber("10100001")),
-        ("ap mod 2", ModulatedNumber("01100010")),
-        ("ap mod -2", ModulatedNumber("10100010")),
-        ("ap mod 16", ModulatedNumber("0111000010000")),
-        ("ap mod -16", ModulatedNumber("1011000010000")),
-        ("ap mod 255", ModulatedNumber("0111011111111")),
-        ("ap mod -255", ModulatedNumber("1011011111111")),
-        ("ap mod 256", ModulatedNumber("011110000100000000")),
-        ("ap mod -256", ModulatedNumber("101110000100000000")),
+        ("ap mod 0", Modulated("010")),
+        ("ap mod 1", Modulated("01100001")),
+        ("ap mod -1", Modulated("10100001")),
+        ("ap mod 2", Modulated("01100010")),
+        ("ap mod -2", Modulated("10100010")),
+        ("ap mod 16", Modulated("0111000010000")),
+        ("ap mod -16", Modulated("1011000010000")),
+        ("ap mod 255", Modulated("0111011111111")),
+        ("ap mod -255", Modulated("1011011111111")),
+        ("ap mod 256", Modulated("011110000100000000")),
+        ("ap mod -256", Modulated("101110000100000000")),
         ("ap dem ap mod 0", Number(0)),
         ("ap dem ap mod 12341234", Number(12341234)),
         ("ap dem ap mod -12341234", Number(-12341234)),
@@ -600,15 +652,30 @@ if __name__ == '__main__':
         ("( 10 )", Cons([Number(10), Nil()])),
         ("( 10 , 11 )", Cons([Number(10),
                               Ap(Ap(Cons(), Number(11)), Nil())])),
+            # 35 Modulate List
+        ("ap mod nil", Modulated("00")),
+        ("ap mod ap ap cons nil nil", Modulated("110000")),
+        ("ap mod ap ap cons 0 nil", Modulated("1101000")),
+        ("ap mod ap ap cons 1 2", Modulated("110110000101100010")),
+        ("ap mod ap ap cons 1 ap ap cons 2 nil",
+         Modulated("1101100001110110001000")),
+        ("ap mod ( 1 , 2 )", Modulated("1101100001110110001000")),
+        ("ap mod ( 1 , ( 2 , 3 ) , 4 )",
+         Modulated("1101100001111101100010110110001100110110010000")),
+            # 36 Send ( 0 ) # TODO: raise error everytime, because the number decrease by time...
+            # ("ap send ( 0 )", Cons([Number(1), Cons([Number(0), Nil()])])),
+            # 37 Is 0
+        ("ap ap ap if0 0 10 11", Number(10)),
+        ("ap ap ap if0 1 10 11", Number(11))
     ]):
         try:
             val = interpreter.evaluate_expression(test_case[0])
             if not val.equal(test_case[1]):
                 print(
-                    f"case {i}: `{test_case[0]}`\nexpected {test_case[1]}\nbut      {val}"
+                    f"case {i}: `{test_case[0]}`\n\texpected {test_case[1]}\n\tbut      {val}"
                 )
         except Exception as e:
             print(f"case {i}: `{test_case[0]}` exception {e}")
-            print(traceback.format_exc())
+            # print(traceback.format_exc())
 
     print("test finished!")
