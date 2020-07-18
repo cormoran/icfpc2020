@@ -35,6 +35,19 @@ def ensure_type(node: Node, t: typing.ClassVar) -> Node:
     return node
 
 
+# evaluate `node` until it's type become `t`
+def evaluate_to_type(node: Node, t: typing.ClassVar) -> Node:
+    prev = None
+    now = node
+    while not isinstance(now, t):
+        prev = now
+        now = now.evaluate()
+        if now == prev:
+            raise Exception(
+                f"infinite loop detected in evaluate_to_type({node}, {t})")
+    return now
+
+
 @dataclasses.dataclass
 class Number(Node):
     n: int
@@ -44,6 +57,25 @@ class Number(Node):
 
     def equal(self, target):
         return isinstance(target, Number) and target.n == self.n
+
+
+@dataclasses.dataclass
+class Picture(Node):
+    @dataclasses.dataclass
+    class Point:
+        x: int
+        y: int
+
+    points: typing.List[Point] = dataclasses.field(default_factory=list)
+
+    def add_point(self, x, y):
+        self.points.append(self.Point(x, y))
+
+    def evaluate(self) -> Node:
+        return self
+
+    def equal(self, target):
+        raise NotImplementedError()
 
 
 @dataclasses.dataclass
@@ -107,7 +139,7 @@ class Inc(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        n = ensure_type(self.args[0].evaluate(), Number)
+        n = evaluate_to_type(self.args[0], Number)
         return Number(n.n + 1)
 
 
@@ -116,7 +148,7 @@ class Dec(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        n = ensure_type(self.args[0].evaluate(), Number)
+        n = evaluate_to_type(self.args[0], Number)
         return Number(n.n - 1)
 
 
@@ -125,8 +157,8 @@ class Add(NArgOp):
     n_args = 2
 
     def _evaluate(self) -> Node:
-        n1 = ensure_type(self.args[0].evaluate(), Number)
-        n2 = ensure_type(self.args[1].evaluate(), Number)
+        n1 = evaluate_to_type(self.args[0], Number)
+        n2 = evaluate_to_type(self.args[1], Number)
         return Number(n1.n + n2.n)
 
 
@@ -135,8 +167,8 @@ class Mul(NArgOp):
     n_args = 2
 
     def _evaluate(self) -> Node:
-        n1 = ensure_type(self.args[0].evaluate(), Number)
-        n2 = ensure_type(self.args[1].evaluate(), Number)
+        n1 = evaluate_to_type(self.args[0], Number)
+        n2 = evaluate_to_type(self.args[1], Number)
         return Number(n1.n * n2.n)
 
 
@@ -145,8 +177,8 @@ class Div(NArgOp):
     n_args = 2
 
     def _evaluate(self) -> Node:
-        n1 = ensure_type(self.args[0].evaluate(), Number)
-        n2 = ensure_type(self.args[1].evaluate(), Number)
+        n1 = evaluate_to_type(self.args[0], Number)
+        n2 = evaluate_to_type(self.args[1], Number)
         sign = 1 if n1.n * n2.n >= 0 else -1
         return Number(abs(n1.n) // abs(n2.n) * sign)
 
@@ -156,9 +188,8 @@ class Eq(NArgOp):
     n_args = 2
 
     def _evaluate(self) -> Node:
-        # TODO: 評価しなくても、subtree が同じ形ならよさそう
-        n1 = self.args[0].evaluate()
-        n2 = self.args[1].evaluate()
+        n1 = self.args[0]
+        n2 = self.args[1]
         return T() if n1.equal(n2) else F()
 
 
@@ -167,8 +198,8 @@ class Lt(NArgOp):
     n_args = 2
 
     def _evaluate(self) -> Node:
-        n1 = ensure_type(self.args[0].evaluate(), Number)
-        n2 = ensure_type(self.args[1].evaluate(), Number)
+        n1 = evaluate_to_type(self.args[0], Number)
+        n2 = evaluate_to_type(self.args[1], Number)
         return T() if n1.n < n2.n else F()
 
 
@@ -177,7 +208,7 @@ class Modulate(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        n = ensure_type(self.args[0].evaluate(), Number)
+        n = evaluate_to_type(self.args[0], Number)
         return ModulatedNumber(self.modulate(n.n))
 
     def modulate(self, x: int) -> str:
@@ -213,7 +244,7 @@ class Demodulate(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        n = ensure_type(self.args[0].evaluate(), ModulatedNumber)
+        n = evaluate_to_type(self.args[0], ModulatedNumber)
         return Number(self.demodulate(n.n))
 
     def demodulate(self, x: str) -> int:
@@ -245,8 +276,8 @@ class Send(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        n = ensure_type(
-            Ap(Modulate(), self.args[0]).evaluate(), ModulatedNumber)
+        n = Ap(Modulate(), self.args[0])
+        n = evaluate_to_type(n, ModulatedNumber)
         res = requests.post(server_url + '/alians/send', n.n)
         if res.status_code != 200:
             print('Unexpected server response:')
@@ -261,7 +292,7 @@ class Neg(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        n = ensure_type(self.args[0].evaluate(), Number)
+        n = evaluate_to_type(self.args[0], Number)
         return Number(-n.n)
 
 
@@ -271,6 +302,7 @@ class Ap(Node):
     arg: typing.Optional[Node]
 
     def ap(self, arg):
+        # TODO: evaluate
         return self.evaluate().ap(arg)
 
     # return func or value
@@ -289,7 +321,7 @@ class S(NArgOp):
         # TODO: 知らんぞ
         a = Ap(self.args[0], self.args[2])
         b = Ap(self.args[1], self.args[2])
-        return Ap(a, b).evaluate()
+        return Ap(a, b)
 
 
 @dataclasses.dataclass
@@ -299,7 +331,7 @@ class C(NArgOp):
     def _evaluate(self) -> Node:
         # TODO: 知らんぞ
         a = Ap(self.args[0], self.args[2])
-        return Ap(a, self.args[1]).evaluate()
+        return Ap(a, self.args[1])
 
 
 @dataclasses.dataclass
@@ -309,7 +341,7 @@ class B(NArgOp):
     def _evaluate(self) -> Node:
         # TODO: 知らんぞ
         a = Ap(self.args[1], self.args[2])
-        return Ap(self.args[0], a).evaluate()
+        return Ap(self.args[0], a)
 
 
 @dataclasses.dataclass
@@ -317,7 +349,7 @@ class T(NArgOp):
     n_args = 2
 
     def _evaluate(self) -> Node:
-        return self.args[0].evaluate()
+        return self.args[0]
 
     def equal(self, target):
         if isinstance(target, T) and len(self.args) == 0 and len(
@@ -334,7 +366,7 @@ class F(NArgOp):
     n_args = 2
 
     def _evaluate(self) -> Node:
-        return self.args[1].evaluate()
+        return self.args[1]
 
     def equal(self, target):
         if isinstance(target, F) and len(self.args) == 0 and len(
@@ -351,7 +383,7 @@ class Pwr2(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        n = ensure_type(self.args[0].evaluate(), Number)
+        n = evaluate_to_type(self.args[0], Number)
         return Number(2**n.n)
 
 
@@ -360,7 +392,7 @@ class I(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        return self.args[0]  # TODO: evaluate or not
+        return self.args[0]
 
 
 @dataclasses.dataclass
@@ -369,7 +401,7 @@ class Cons(NArgOp):
 
     def _evaluate(self) -> Node:
         a = Ap(self.args[2], self.args[0])
-        return Ap(a, self.args[1]).evaluate()
+        return Ap(a, self.args[1])
 
 
 @dataclasses.dataclass
@@ -377,9 +409,9 @@ class Car(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        assert isinstance(self.args[0], Cons)
-        assert len(self.args[0].args) <= 2
-        return self.args[0].args[0]  # TODO: evaluate?
+        arg = evaluate_to_type(self.args[0], Cons)
+        assert len(arg.args) <= 2
+        return arg.args[0]  # TODO: evaluate?
 
 
 @dataclasses.dataclass
@@ -387,9 +419,9 @@ class Cdr(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        assert isinstance(self.args[0], Cons)
-        assert len(self.args[0].args) == 2
-        return self.args[0].args[1]  # TODO: evaluate?
+        arg = evaluate_to_type(self.args[0], Cons)
+        assert len(arg.args) == 2
+        return arg.args[1]  # TODO: evaluate?
 
 
 @dataclasses.dataclass
@@ -420,6 +452,14 @@ class IsNil(NArgOp):
         return T() if isinstance(n, Nil) else F()
 
 
+# @dataclasses.dataclass
+# class Draw(NArgOp):
+#     n_args = 1
+
+#     def _evaluate(self) -> Node:
+#         arg = evaluate_to_type(self.args[0], Cons)
+#         picture = Picture()
+
 token_node_map = {
     "inc": Inc,
     "dec": Dec,
@@ -445,6 +485,7 @@ token_node_map = {
     "cdr": Cdr,
     "nil": Nil,
     "isnil": IsNil,
+    "vec": Cons,
 }
 
 
@@ -488,7 +529,7 @@ class Interpreter():
             while tokens[i] == ",":
                 elem, i = self._build(i + 1, tokens)
                 elements.append(elem)
-            assert tokens[i + 1] == ")"
+            assert tokens[i] == ")"
 
             return self._build_list(0, elements), i + 1
         else:
@@ -497,7 +538,7 @@ class Interpreter():
     def _build_list(self, i, elements):
         if i == len(elements):
             return Nil()
-        return Ap(Ap(Cons(), elements[i], self._build_list(i + 1, elements)))
+        return Ap(Ap(Cons(), elements[i]), self._build_list(i + 1, elements))
 
 
 def evaluate_all(node: Node):
@@ -557,11 +598,18 @@ if __name__ == '__main__':
         ("ap pwr2 2", Number(4)),
         ("ap pwr2 3", Number(8)),
         ("ap pwr2 4", Number(16)),
-            # TODO:
+        ("ap i 10", Number(10)),
+            # ("ap i i", I()),
+            # ("ap i add", Add()),
+            # ("ap ap ap cons x0 x1 x2   =   ap ap x2 x0 x1")
+        ("ap car ap ap cons 10 11", Number(10)),
+        ("ap cdr ap ap cons 10 11", Number(11)),
+            # ("ap cdr x2   =   ap x2 f")
         ("ap nil 10", T()),
             # ("ap isnil nil", T()), # TODO:
         ("ap isnil ap ap cons 10 11", F()),
         ("( )", Nil()),
+            # ("( 10 )", TODO),
     ]):
         try:
             val = interpreter.evaluate_expression(test_case[0])
