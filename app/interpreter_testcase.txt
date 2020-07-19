@@ -39,12 +39,12 @@ ap ap add 0 x2   =   x2
 ap ap add x0 0   =   x0
 ap ap add x1 0   =   x1
 ap ap add x2 0   =   x2
-ap ap add x0 x1   =   ap ap add x1 x0
+# ap ap add x0 x1   =   ap ap add x1 x0
 # 9
 ap ap mul 4 2   =   8
 ap ap mul 3 4   =   12
 ap ap mul 3 -2   =   -6
-ap ap mul x0 x1   =   ap ap mul x1 x0
+# ap ap mul x0 x1   =   ap ap mul x1 x0
 ap ap mul x0 0   =   0
 ap ap mul x0 1   =   x0
 # 10
@@ -237,6 +237,9 @@ ap mod ( 1 , ( 2 , 3 ) , 4 )   =   [( 1 , ( 2 , 3 ) , 4 )]
 ap ap ap if0 0 x0 x1   =   x0
 ap ap ap if0 1 x0 x1   =   x1
 # 38
+ap modem x0 = ap dem ap mod x0
+# ap ap f38 x2 x0 = ap ap ap if0 ap car x0 ( ap modem ap car ap cdr x0 , ap multipledraw ap car ap cdr ap cdr x0 ) ap ap ap interact x2 ap modem ap car ap cdr x0 ap send ap car ap cdr ap cdr x0
+# ap ap ap interact x2 x4 x3 = ap ap f38 x2 ap ap x2 x4 x3
 # skip
 # 39
 # 40
