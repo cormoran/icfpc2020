@@ -465,7 +465,10 @@ class Cons(NArgOp):
         while isinstance(cons, Cons) and len(cons.args) == 2:
             res += cons.args[0].print() + ' , '
             cons = cons.args[1]
-        res += cons.print()
+        if not isinstance(cons, Nil):
+            res += cons.print()
+        else:
+            res = res[:-3]  # remove ` , `
         res += ')'
         return res
 
