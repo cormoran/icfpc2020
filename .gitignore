@@ -1,4 +1,5 @@
-.vscode/
-.vs/
-build/
+__pycache__/
+*.py[cod]
 Dockerfile
+.vscode
+
