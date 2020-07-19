@@ -16,14 +16,16 @@ def main():
     interpreter = Interpreter()
 
     print(
-        interpreter.evaluate_expression(f"ap send ( 2 , {player_key} , ( ) )"))
+        interpreter.evaluate_expression(
+            f"ap send ( 2 , {player_key} , ( ) )").print())
 
     print(
         interpreter.evaluate_expression(
-            f"ap send ( 3 , {player_key} , ( 1 , 2 , 3 , 4 ) )"))
+            f"ap send ( 3 , {player_key} , ( 1 , 2 , 3 , 4 ) )").print())
 
     print(
-        interpreter.evaluate_expression(f"ap send ( 4 , {player_key} , ( ) )"))
+        interpreter.evaluate_expression(
+            f"ap send ( 4 , {player_key} , ( ) )").print())
 
 
 if __name__ == '__main__':

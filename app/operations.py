@@ -33,6 +33,9 @@ class Node:
     def equal(self, target):
         return False
 
+    def print(self, indent=0):
+        return '\t' * indent + str(self)
+
 
 # evaluate `node` until it's type become `t`
 def evaluate_to_type(node: Node, t: typing.Union[type,
@@ -61,6 +64,38 @@ class Number(Node):
         if isinstance(target, int):
             return self.n == target
         return isinstance(target, Number) and target.n == self.n
+
+    def print(self, indent=0):
+        return '\t' * indent + str(self.n)
+
+
+@dataclasses.dataclass
+class Variable(Node):
+    ident: str
+    args: typing.List[Node] = dataclasses.field(default_factory=list)
+
+    def ap(self, arg) -> Node:
+        return Variable(self.ident, self.args + [arg])
+
+    def evaluate(self) -> Node:
+        # TODO: get real value from var dict
+        return self
+
+    def equal(self, target):
+        # TODO: get real value from var dict
+        if not isinstance(target, Variable):
+            return False
+        if target.ident != self.ident:
+            return False
+        if len(self.args) != len(target.args):
+            return False
+        for a, b in zip(self.args, target.args):
+            if not a.equal(b):
+                return False
+        return True
+
+    def print(self, indent=0):
+        return '\t' * indent + 'Var(' + self.ident + ')'
 
 
 @dataclasses.dataclass
@@ -95,7 +130,7 @@ class Picture(Node):
                 return False
         return True
 
-    def print(self):
+    def print(self, indent=0):
         min_x, max_x = 0, 0
         min_y, max_y = 0, 0
         for p in self.points:
@@ -107,10 +142,10 @@ class Picture(Node):
                   for y in range(max_y - min_y + 1)]
         for p in self.points:
             canvas[p.y][p.x] = '#'
+        res = '\t' * indent + 'Picture(\n'
         for line in canvas:
-            print()
-            print(''.join(line))
-            print()
+            res += '\t' * indent + ''.join(line) + '\n'
+        res += '\t' * indent + ')'
 
 
 @dataclasses.dataclass
@@ -153,6 +188,13 @@ class NArgOp(Node):
             if not a.equal(b):
                 return False
         return True
+
+    def print(self, indent=0):
+        res = '\t' * indent + self.__class__.__name__ + '(\n'
+        for arg in self.args:
+            res += arg.print(indent=indent + 1) + '\n'
+        res += '\t' * indent + ')'
+        return res
 
 
 @dataclasses.dataclass
@@ -320,6 +362,14 @@ class Ap(Node):
             return False
         return self.func.equal(target.func) and self.arg.equal(target.arg)
 
+    def print(self, indent=0):
+        res = '\t' * indent + 'Ap(\n'
+        res += '\t' * indent + 'func\n'
+        res += self.func.print(indent=indent + 1)
+        res += '\t' * indent + 'arg\n'
+        res += self.arg.print(indent=indent + 1)
+        res += '\t' * indent + ')'
+
 
 @dataclasses.dataclass
 class S(NArgOp):
@@ -364,6 +414,9 @@ class T(NArgOp):
             return True
         return super().equal(target)
 
+    def print(self, indent=0):
+        return '\t' * indent + 'True'
+
 
 @dataclasses.dataclass
 class F(NArgOp):
@@ -377,6 +430,9 @@ class F(NArgOp):
                 target.args) == 0:
             return True
         return super().equal(target)
+
+    def print(self, indent=0):
+        return '\t' * indent + 'False'
 
 
 @dataclasses.dataclass
@@ -403,6 +459,18 @@ class Cons(NArgOp):
     def _evaluate(self) -> Node:
         a = Ap(self.args[2], self.args[0])
         return Ap(a, self.args[1])
+
+    def print(self, indent=0):
+        if len(self.args) < 2:
+            return super().print(indent)
+        res = '\t' * indent + '('
+        cons = self
+        while isinstance(cons, Cons) and len(cons.args) == 2:
+            res += cons.args[0].print() + ' , '
+            cons = cons.args[1]
+        res += cons.print()
+        res += ')'
+        return res
 
 
 @dataclasses.dataclass
@@ -439,6 +507,9 @@ class Nil(NArgOp):
                 target.args) == 0:
             return True
         return super().equal(target)
+
+    def print(self, indent=0):
+        return '\t' * indent + 'Nil'
 
 
 @dataclasses.dataclass

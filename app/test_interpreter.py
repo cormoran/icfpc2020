@@ -5,7 +5,8 @@ import os
 from operations import *
 from interpreter import Interpreter
 
-if __name__ == '__main__':
+
+def test_v1():
     interpreter = Interpreter()
     for i, test_case in enumerate([
         ("ap inc 0", Number(1)),
@@ -59,7 +60,7 @@ if __name__ == '__main__':
         ("ap i 10", Number(10)),
         ("ap i i", I()),
         ("ap i add", Add()),
-            # ("ap ap ap cons x0 x1 x2   =   ap ap x2 x0 x1")
+        ("ap ap ap cons :x0 :x1 :x2", "ap ap :x2 :x0 :x1"),
         ("ap ap ap cons 10 11 add", Number(21)),
         ("ap car ap ap cons 10 11", Number(10)),
         ("ap cdr ap ap cons 10 11", Number(11)),
@@ -120,13 +121,40 @@ if __name__ == '__main__':
             # ap ap ap interact statefulldraw x4 ap ap vec 4 0 = ( x5 , ( [0,0;2,3;1,2;3,2;4,0] ) )
     ]):
         try:
+            expected = test_case[1]
+            if isinstance(expected, str):
+                expected = interpreter.evaluate_expression(expected)
             val = interpreter.evaluate_expression(test_case[0])
-            if not val.equal(test_case[1]):
+            if not val.equal(expected):
                 print(
-                    f"case {i}: `{test_case[0]}`\n\texpected {test_case[1]}\n\tbut      {val}"
+                    f"case {i}: `{test_case[0]}`\n\texpected {expected}\n\tbut      {val}"
                 )
         except Exception as e:
             print(f"case {i}: `{test_case[0]}` exception {e}")
             print(traceback.format_exc())
 
     print("test finished!")
+
+
+def test_v2():
+    interpreter = Interpreter()
+    with open('./app/interpreter_testcase.txt', 'r') as f:
+        for i, line in enumerate(f.readlines()):
+            line = line.replace("[", "[ ").replace("]", " ]")
+            if line.startswith("#"):
+                continue
+            left, right = line.split(" = ")
+            try:
+                left_node = interpreter.evaluate_expression(left)
+                right_node = interpreter.evaluate_expression(right)
+                if not left_node.equal(right_node):
+                    print(f"line {i+1}: `{line}`")
+                    print(f"\texpected {right_node.print()}")
+                    print(f"\tbut      {left_node.print()}")
+            except Exception as e:
+                print(f"line {i+1}: `{line}` exception {e}")
+
+
+if __name__ == '__main__':
+    test_v1()
+    test_v2()

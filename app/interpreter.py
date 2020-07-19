@@ -28,7 +28,7 @@ class Interpreter():
         var_name = tokens[0]
         assert var_name not in self.var_dict
         self.var_dict[var_name] = self._evaluate_expression(tokens[2:])
-        print(f"{var_name} = {self.var_dict[var_name]}")
+        print(f"{var_name} = {self.var_dict[var_name].print()}")
 
     # evaluate expression such as `ap inc 0`
     # and returns ast root node
@@ -56,6 +56,10 @@ class Interpreter():
             assert tokens[i] == ")"
 
             return self._build_list(0, elements), i + 1
+        elif tokens[i] == "[":
+            elem, i = self._build(i + 1, tokens)
+            assert tokens[i] == "]"
+            return Ap(Modulate(), elem), i + 1
         else:
             return self._token_to_node(tokens[i]), i + 1
 
@@ -70,4 +74,7 @@ class Interpreter():
             return token_node_map[token]()
         if token in self.var_dict:
             return self.var_dict[token]
-        return Number(int(token))
+        try:
+            return Number(int(token))
+        except ValueError:
+            return Variable(token)
