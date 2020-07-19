@@ -165,7 +165,12 @@ class NArgOp(Node):
 
     def evaluate(self, env: Environment) -> Node:
         if len(self.args) == self.n_args:
-            return self._evaluate(env)
+            if hasattr(self, "_evaluated"):
+                return self._evaluated
+            cache = self._evaluate(env)
+            if id(self) != id(cache):
+                self._evaluated = cache
+            return cache
         return self  # cannot evaluate now
 
     def _evaluate(self, env: Environment) -> Node:
@@ -199,7 +204,8 @@ class Inc(NArgOp):
         n = self.args[0].evaluate(env)
         if isinstance(n, Number):
             return Number(n.n + 1)
-        return Inc([n])
+        self.args[0] = n
+        return self
 
 
 @dataclasses.dataclass
@@ -211,7 +217,8 @@ class Dec(NArgOp):
         n = self.args[0].evaluate(env)
         if isinstance(n, Number):
             return Number(n.n - 1)
-        return Dec([n])
+        self.aargs[0] = n
+        return self
 
 
 @dataclasses.dataclass
@@ -223,13 +230,15 @@ class Add(NArgOp):
         # n2 = evaluate_to_type(env, self.args[1], Number)
         n1 = self.args[0].evaluate(env)
         n2 = self.args[1].evaluate(env)
+        self.args[0] = n1
+        self.args[1] = n2
         if isinstance(n1, Number) and isinstance(n2, Number):
             return Number(n1.n + n2.n)
         if isinstance(n1, Number) and n1.n == 0:
             return n2
         if isinstance(n2, Number) and n2.n == 0:
             return n1
-        return Add([n1, n2])
+        return self
 
     # def __eq__(self, target):
     #     if self.__class__ != target.__class__:
@@ -246,6 +255,8 @@ class Mul(NArgOp):
         #n2 = evaluate_to_type(env, self.args[1], Number)
         n1 = self.args[0].evaluate(env)
         n2 = self.args[1].evaluate(env)
+        self.args[0] = n1
+        self.args[1] = n2
         if isinstance(n1, Number) and isinstance(n2, Number):
             return Number(n1.n * n2.n)
         if isinstance(n1, Number) and n1.n == 0:
@@ -256,7 +267,7 @@ class Mul(NArgOp):
             return n2
         if isinstance(n2, Number) and n2.n == 1:
             return n1
-        return Mul([n1, n2])
+        return self
 
     # def __eq__(self, target):
     #     if self.__class__ != target.__class__:
@@ -273,10 +284,12 @@ class Div(NArgOp):
         # n2 = evaluate_to_type(env, self.args[1], Number)
         n1 = self.args[0].evaluate(env)
         n2 = self.args[1].evaluate(env)
+        self.args[0] = n1
+        self.args[1] = n2
         if isinstance(n1, Number) and isinstance(n2, Number):
             sign = 1 if n1.n * n2.n >= 0 else -1
             return Number(abs(n1.n) // abs(n2.n) * sign)
-        return Div([n1, n2])
+        return self
 
 
 @dataclasses.dataclass
@@ -286,6 +299,8 @@ class Eq(NArgOp):
     def _evaluate(self, env: Environment) -> Node:
         n1 = self.args[0].evaluate(env)
         n2 = self.args[1].evaluate(env)
+        self.args[0] = n1
+        self.args[1] = n1
         return T() if n1 == n2 else F()
 
 
@@ -298,9 +313,11 @@ class Lt(NArgOp):
         # n2 = evaluate_to_type(env, self.args[1], Number)
         n1 = self.args[0].evaluate(env)
         n2 = self.args[1].evaluate(env)
+        self.args[0] = n1
+        self.args[1] = n1
         if isinstance(n1, Number) and isinstance(n2, Number):
             return T() if n1.n < n2.n else F()
-        return Lt([n1, n2])
+        return self
 
 
 @dataclasses.dataclass
@@ -310,10 +327,11 @@ class Modulate(NArgOp):
     def _evaluate(self, env: Environment) -> Node:
         # n = evaluate_to_type(env, self.args[0], [Number, Cons, Nil])
         n = self.args[0].evaluate(env)
+        self.args[0] = n
         if isinstance(n, (Number, Cons, Nil)):
             res = self._modulate_node(env, n)
             return Modulated(res) if isinstance(res, str) else Modulate([res])
-        return Modulate([n])
+        return self
 
     def _modulate_node(self, env: Environment,
                        node: Node) -> typing.Union[Node, str]:
@@ -332,11 +350,13 @@ class Modulate(NArgOp):
         # n2 = evaluate_to_type(env, cons.args[1], [Number, Cons, Nil])
         n1 = cons.args[0].evaluate(env)
         n2 = cons.args[1].evaluate(env)
+        cons.args[0] = n1
+        cons.args[1] = n2
         if isinstance(n1, (Number, Cons, Nil)) and isinstance(
                 n2, (Number, Cons, Nil)):
             return "11" + self._modulate_node(env, n1) + self._modulate_node(
                 env, n2)
-        return Cons([n1, n2])
+        return cons
 
 
 @dataclasses.dataclass
@@ -346,13 +366,14 @@ class Demodulate(NArgOp):
     def _evaluate(self, env: Environment) -> Node:
         # n = evaluate_to_type(env, self.args[0], Modulated)
         n = self.args[0].evaluate(env)
+        self.args[0] = n
         if isinstance(n, Modulated):
             node, left = self._demodulate(n.n)
             if len(left) != 0:
                 print(left)
                 assert len(left) == 0
             return node
-        return Demodulate([n])
+        return self
 
     def _demodulate(self, x: str) -> Node:
         xx = x
@@ -375,6 +396,7 @@ class Send(NArgOp):
 
     def _evaluate(self, env: Environment) -> Node:
         n = Ap(Modulate(), self.args[0]).evaluate(env)
+        self.args[0] = n
         if isinstance(n, Modulated):
             print('* [Human -> Alien]', n.n)
             res = requests.post(server_url + '/aliens/send' + query_param, n.n)
@@ -385,7 +407,7 @@ class Send(NArgOp):
                 raise Exception('Unexpected server response:')
             print('* [Alien -> Human]', res.text)
             return Ap(Demodulate(), Modulated(res.text)).evaluate(env)
-        return Send([n])
+        return self
 
 
 @dataclasses.dataclass
@@ -395,9 +417,10 @@ class Neg(NArgOp):
     def _evaluate(self, env: Environment) -> Node:
         # n = evaluate_to_type(env, self.args[0], Number)
         n = self.args[0].evaluate(env)
+        self.args[0] = n
         if isinstance(n, Number):
             return Number(-n.n)
-        return Neg([n])
+        return self
 
 
 @dataclasses.dataclass
@@ -411,10 +434,14 @@ class Ap(Node):
 
     # return func or value
     def evaluate(self, env: Environment) -> Node:
+        if hasattr(self, "_cache"):
+            return self._cache
         func = self.func
         while isinstance(func, Ap):
             func = func.evaluate(env)
-        return func.ap(env, self.arg).evaluate(env)
+        res = func.ap(env, self.arg).evaluate(env)
+        self._cache = res
+        return res
 
     # compare all subtree
     def __eq__(self, target):
@@ -501,9 +528,10 @@ class Pwr2(NArgOp):
     def _evaluate(self, env: Environment) -> Node:
         # n = evaluate_to_type(env, self.args[0], Number)
         n = self.args[0].evaluate(env)
+        self.args[0] = n
         if isinstance(n, Number):
             return Number(2**n.n)
-        return Pwr2([n])
+        return self
 
 
 @dataclasses.dataclass
@@ -511,7 +539,8 @@ class I(NArgOp):
     n_args = 1
 
     def _evaluate(self, env: Environment) -> Node:
-        return self.args[0].evaluate(env)
+        self.args[0] = self.args[0].evaluate(env)
+        return self.args[0]
 
 
 @dataclasses.dataclass
@@ -519,8 +548,11 @@ class Cons(NArgOp):
     n_args = 3
 
     def _evaluate(self, env: Environment) -> Node:
+        if hasattr(self, "_cache"):
+            return self._cache
         a = Ap(self.args[2], self.args[0])
-        return Ap(a, self.args[1]).evaluate(env)
+        self._cache = Ap(a, self.args[1]).evaluate(env)
+        return self._cache
 
     def print(self, indent=0):
         if len(self.args) < 2:
@@ -545,9 +577,11 @@ class Car(NArgOp):
     def _evaluate(self, env: Environment) -> Node:
         # arg = evaluate_to_type(env, self.args[0], Cons)
         arg = self.args[0].evaluate(env)
+        self.args[0] = arg
         if isinstance(arg, Cons):
-            return arg.args[0].evaluate(env)
-        return Car([arg])
+            arg.args[0] = arg.args[0].evaluate(env)
+            return arg.args[0]
+        return self
 
 
 @dataclasses.dataclass
@@ -556,9 +590,11 @@ class Cdr(NArgOp):
 
     def _evaluate(self, env: Environment) -> Node:
         arg = self.args[0].evaluate(env)
+        self.args[0] = arg
         if isinstance(arg, Cons):
-            return arg.args[1].evaluate(env)
-        return Cdr([arg])
+            arg.args[1] = arg.args[1].evaluate(env)
+            return arg.args[1]
+        return self
 
 
 @dataclasses.dataclass
