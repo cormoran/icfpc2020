@@ -36,8 +36,8 @@ class StaticGameInfo:
 class Ship:
     role: int = None
     shipId: int = None
-    position: op.Node = None
-    velocity: op.Node = None
+    position: typing.Tuple[int, int] = None
+    velocity: typing.Tuple[int, int] = None
     x4: op.Node = None
     x5: op.Node = None
     x6: op.Node = None
