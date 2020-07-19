@@ -115,21 +115,27 @@ def main():
     print('ServerUrl: %s; PlayerKey: %s' % (server_url, player_key))
 
     op.set_parameter(
-        server_url, '' if not dev_mode else
+        server_url, '' if os.environ.get("API_KEY", "") == "" else
         ("?apiKey=" + os.environ.get("API_KEY", "")))
 
     interpreter = Interpreter()
 
     if dev_mode:
-        res = interpreter.evaluate_expression("ap send ( 1 )")
+        res = interpreter.evaluate_expression("ap send ( 1 , 0 )")
         print(res)
         if not isinstance(res, op.Cons) or res.args[0] != op.Number(1):
             raise Exception("failed to CREATE player_key")
-        attacker_player_key = get(1, get(0, get(1, res)))
-        defender_player_key = get(1, get(1, get(1, res)))
-        print(attacker_player_key)
-        print(defender_player_key)
-        exit(0)
+        attacker_player_key = str(get(1, get(0, get(1, res))).n)
+        defender_player_key = str(get(1, get(1, get(1, res))).n)
+        print('attacker', attacker_player_key)
+        print('defender', defender_player_key)
+
+        if dev_mode == "attack":
+            player_key = attacker_player_key
+            print('attacker mode')
+        else:
+            player_key = defender_player_key
+            print('defender mode')
 
     print_game_response(
         interpreter.evaluate_expression(f"ap send ( 2 , {player_key} , ( ) )"))
