@@ -5,7 +5,8 @@ import os
 from operations import *
 from interpreter import Interpreter
 
-if __name__ == '__main__':
+
+def test_v1():
     interpreter = Interpreter()
     for i, test_case in enumerate([
         ("ap inc 0", Number(1)),
@@ -133,3 +134,27 @@ if __name__ == '__main__':
             print(traceback.format_exc())
 
     print("test finished!")
+
+
+def test_v2():
+    interpreter = Interpreter()
+    with open('./app/interpreter_testcase.txt', 'r') as f:
+        for i, line in enumerate(f.readlines()):
+            line = line.replace("[", "[ ").replace("]", " ]")
+            if line.startswith("#"):
+                continue
+            left, right = line.split(" = ")
+            try:
+                left_node = interpreter.evaluate_expression(left)
+                right_node = interpreter.evaluate_expression(right)
+                if not left_node.equal(right_node):
+                    print(f"line {i+1}: `{line}`")
+                    print(f"\texpected {right_node.print()}")
+                    print(f"\tbut      {left_node.print()}")
+            except Exception as e:
+                print(f"line {i+1}: `{line}` exception {e}")
+
+
+if __name__ == '__main__':
+    test_v1()
+    test_v2()

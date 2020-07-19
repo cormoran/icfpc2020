@@ -56,6 +56,10 @@ class Interpreter():
             assert tokens[i] == ")"
 
             return self._build_list(0, elements), i + 1
+        elif tokens[i] == "[":
+            elem, i = self._build(i + 1, tokens)
+            assert tokens[i] == "]"
+            return Ap(Modulate(), elem), i + 1
         else:
             return self._token_to_node(tokens[i]), i + 1
 
@@ -70,6 +74,7 @@ class Interpreter():
             return token_node_map[token]()
         if token in self.var_dict:
             return self.var_dict[token]
-        if token.startswith(":"):  # TODO: 不十分？
+        try:
+            return Number(int(token))
+        except ValueError:
             return Variable(token)
-        return Number(int(token))
