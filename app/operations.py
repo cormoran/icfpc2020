@@ -6,7 +6,7 @@ import traceback
 import os
 
 server_url = "https://icfpc2020-api.testkontur.ru"
-query_param = "?apiKey=" + os.environ.get("API_KEY")
+query_param = "?apiKey=" + os.environ.get("API_KEY", "")
 
 import modulate
 
