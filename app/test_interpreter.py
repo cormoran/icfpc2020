@@ -112,9 +112,13 @@ def test_v1():
             # 40 Stateless Drawing Protocol
             # TODO: ( nil , ( [1,0] ) ) になってほしいけど ( ) が少ない気がする...
         ("ap ap ap interact statelessdraw nil ap ap vec 1 0",
-         make_list([Nil(), Picture([Point(1, 0)])])),
+         make_list([Nil(), make_list([Picture([Point(1, 0)])])])),
             # 41 Statefull Drawing Protocol
-            # ap ap ap interact statefulldraw nil ap ap vec 0 0 = ( ( ap ap vec 0 0 ) , ( [0,0] ) )
+        ("ap ap ap interact statefulldraw nil ap ap vec 0 0",
+         make_list([
+             make_list([Cons([Number(0), Number(0)])]),
+             make_list([Picture([Point(0, 0)])])
+         ])),
             # ap ap ap interact statefulldraw ( ap ap vec 0 0 ) ap ap vec 2 3 = ( x2 , ( [0,0;2,3] ) )
             # ap ap ap interact statefulldraw x2 ap ap vec 1 2 = ( x3 , ( [0,0;2,3;1,2] ) )
             # ap ap ap interact statefulldraw x3 ap ap vec 3 2 = ( x4 , ( [0,0;2,3;1,2;3,2] ) )
@@ -143,6 +147,7 @@ def test_v2():
             line = line.replace("[", "[ ").replace("]", " ]")
             if line.startswith("#"):
                 continue
+            print("case", i + 1)
             left, right = line.split(" = ")
             try:
                 left_node = interpreter.evaluate_expression(left)
@@ -153,6 +158,7 @@ def test_v2():
                     print(f"\tbut      {left_node.print()}")
             except Exception as e:
                 print(f"line {i+1}: `{line}` exception {e}")
+                print(traceback.format_exc())
 
 
 if __name__ == '__main__':

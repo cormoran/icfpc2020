@@ -14,12 +14,11 @@ def evaluate_all(env: Environment, node: Node):
     prev = node
     while True:
         node = node.evaluate(env)
-        if isinstance(node, NArgOp):
-            node.args = list(map(lambda a: evaluate_all(env, a), node.args))
         if prev == node:
             break
         prev = node
-
+    if isinstance(node, NArgOp):
+        node.args = list(map(lambda a: evaluate_all(env, a), node.args))
     return node
 
 
@@ -32,17 +31,23 @@ class Interpreter():
         assert tokens[1] == "="
         var_name = tokens[0]
         assert var_name not in self.env.var_dict
-        self.env.var_dict[var_name] = self._evaluate_expression(tokens[2:])
-        print(f"{var_name} = {self.env.var_dict[var_name].print()}")
+        self.env.var_dict[var_name] = self._evaluate_expression(tokens[2:],
+                                                                lazy_eval=True)
+        # print(f"{var_name} = {self.env.var_dict[var_name].print()}")
+
+    def register_variable(self, ident: str, node: Node):
+        self.env.var_dict[ident] = node
 
     # evaluate expression such as `ap inc 0`
     # and returns ast root node
     def evaluate_expression(self, expression: str):
         return self._evaluate_expression(expression.split())
 
-    def _evaluate_expression(self, expression_tokens: typing.List[str]):
+    def _evaluate_expression(self,
+                             expression_tokens: typing.List[str],
+                             lazy_eval=False):
         root, _ = self._build(0, expression_tokens)
-        return evaluate_all(self.env, root)
+        return evaluate_all(self.env, root) if not lazy_eval else root
 
     def _build(self, i, tokens):
         if tokens[i] == "ap":

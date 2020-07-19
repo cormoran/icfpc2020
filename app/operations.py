@@ -139,6 +139,7 @@ class Picture(Node):
         for line in canvas:
             res += '\t' * indent + ''.join(line) + '\n'
         res += '\t' * indent + ')'
+        return res
 
 
 @dataclasses.dataclass
@@ -423,11 +424,12 @@ class Ap(Node):
 
     def print(self, indent=0):
         res = '\t' * indent + 'Ap(\n'
-        res += '\t' * indent + 'func\n'
-        res += self.func.print(indent=indent + 1)
-        res += '\t' * indent + 'arg\n'
-        res += self.arg.print(indent=indent + 1)
+        res += '\t' * indent + '\tfunc=\n'
+        res += self.func.print(indent=indent + 1) + '\n'
+        res += '\t' * indent + '\targ=\n'
+        res += self.arg.print(indent=indent + 1) + '\n'
         res += '\t' * indent + ')'
+        return res
 
 
 @dataclasses.dataclass
@@ -592,9 +594,12 @@ class Draw(NArgOp):
     n_args = 1
 
     def _evaluate(self, env: Environment) -> Node:
-        # TODO: support variable
         picture = Picture()
         arg = self.args[0].evaluate(env)
+        if isinstance(arg, Nil):
+            return picture
+        if not isinstance(arg, Cons):
+            return Draw([arg])
         while isinstance(arg, Cons):
             pair = arg.args[0].evaluate(env)
             x = pair.args[0].evaluate(env)
@@ -604,7 +609,9 @@ class Draw(NArgOp):
             picture.add_point(x.n, y.n)
             arg = arg.args[1].evaluate(env)
             # arg = evaluate_to_type(env, arg.args[1], [Cons, Nil])
-        assert isinstance(arg, Nil)
+        if not isinstance(arg, (Nil, Variable)):
+            print(arg)
+            assert False
         return picture
 
 
@@ -612,15 +619,15 @@ class Draw(NArgOp):
 class MultipleDraw(NArgOp):
     n_args = 1
 
+    # ap multipledraw ap ap cons x0 x1   =   ap ap cons ap draw x0 ap multipledraw x1
     def _evaluate(self, env: Environment) -> Node:
         n = self.args[0].evaluate(env)
         if isinstance(n, Nil):
             return n
         elif isinstance(n, Cons):
             return Ap(Ap(Cons(), Ap(Draw(), n.args[0])),
-                      Ap(MultipleDraw(), n.args[1]))
-        else:
-            raise Exception(f"unknown type node {n}")
+                      Ap(MultipleDraw(), n.args[1])).evaluate(env)
+        return MultipleDraw([n])
 
 
 @dataclasses.dataclass
@@ -628,12 +635,10 @@ class If0(NArgOp):
     n_args = 3
 
     def _evaluate(self, env: Environment) -> Node:
-        # condition = evaluate_to_type(env, self.args[0],
-        #                              Number)  # TODO: 実は number でなくてもよいかも
         condition = self.args[0].evaluate(env)
         if isinstance(condition, Number):
-            return self.args[1 if condition.n == 0 else 2]
-        return If0(self.args.copy())
+            return self.args[1 if condition.n == 0 else 2].evaluate(env)
+        return If0([condition] + self.args[1:])
 
 
 @dataclasses.dataclass
@@ -648,28 +653,42 @@ class Modem(NArgOp):
 class F38(NArgOp):
     n_args = 2
 
-    # "ap ap f38 x2 x0 = ap ap ap if0 ap car x0 ( ap modem ap car ap cdr x0 , ap multipledraw ap car ap cdr ap cdr x0 ) ap ap ap interact x2 ap modem ap car ap cdr x0 ap send ap car ap cdr ap cdr x0"
+    # ap ap f38 x2 x0 = ap ap ap if0
+    #                            ap car x0
+    #                            ( ap modem ap car ap cdr x0 , ap multipledraw ap car ap cdr ap cdr x0 )
+    #                            ap ap ap interact
+    #                                     x2
+    #                                     ap modem
+    #                                        ap car
+    #                                           ap cdr x0
+    #                                     ap send
+    #                                        ap car
+    #                                           ap cdr
+    #                                           ap cdr x0
     def _evaluate(self, env: Environment) -> Node:
         x2 = self.args[0]  # protocol
         x0 = self.args[1]  # (flag, newState, data)
         # ( ap modem ap car ap cdr x0 , ap multipledraw ap car ap cdr ap cdr x0 )
-        list1 = Cons([
-            Ap(Modem(), Ap(Car(), Ap(Cdr(), x0))),
-            Ap(MultipleDraw(), Ap(Car(), Ap(Cdr(), Ap(Cdr(), x0)))),
+        # list1 = (newState, data)
+        list1 = make_list([
+            Ap(Modem(), Ap(Car(), Ap(Cdr(), x0))),  # new state
+            Ap(MultipleDraw(), Ap(Car(), Ap(Cdr(), Ap(Cdr(), x0)))),  # data
         ])
         # yapf: disable
-        a = Ap(Ap(Ap(Interact, x2),
-                  Ap(Modem(), Ap(Car(),
-                                 Ap(Cdr(), x0)))),
-               Ap(Send(),
-                  Ap(Car(),
-                     Ap(Cdr(),
-                        Ap(Cdr(), x0)))))
-
+        # a = interact protocol newState data
+        a = Ap(Ap(Ap(Interact(),
+                     x2),
+                     Ap(Modem(), Ap(Car(),
+                                 Ap(Cdr(), x0)))), # new state
+                     Ap(Send(),
+                        Ap(Car(),
+                           Ap(Cdr(),
+                           Ap(Cdr(), x0))))) # data
+        # if flag -> list1 else a
         return Ap(Ap(Ap(If0(),
-                        Ap(Car(), x0)),
-                     list1),
-                  a).evaluate(env)
+                        Ap(Car(), x0)), # flag
+                        list1),
+                        a).evaluate(env)
         # yapf: enable
 
 
@@ -719,9 +738,13 @@ class StatefullDraw(NArgOp):
     n_args = 2
 
     def _evaluate(self, env: Environment) -> Node:
+        return make_list([
+            Number(0),
+            Ap(Ap(Cons(), self.args[1]), self.args[0]),
+            make_list([Ap(Ap(Cons(), self.args[1]), self.args[0])]),
+        ])
         # ap ap statefulldraw x0 x1 = ( 0 , ap ap cons x1 x0 , ( ap ap cons x1 x0 ) )
         # statefulldraw = ap ap b ap b ap ap s ap ap b ap b ap cons 0 ap ap c ap ap b b cons ap ap c cons nil ap ap c cons nil ap c cons
-        raise NotImplementedError()
 
 
 # elements: [1, 2, 3]
