@@ -70,4 +70,6 @@ class Interpreter():
             return token_node_map[token]()
         if token in self.var_dict:
             return self.var_dict[token]
+        if token.startswith(":"):  # TODO: 不十分？
+            return Variable(token)
         return Number(int(token))

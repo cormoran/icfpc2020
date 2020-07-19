@@ -59,7 +59,7 @@ if __name__ == '__main__':
         ("ap i 10", Number(10)),
         ("ap i i", I()),
         ("ap i add", Add()),
-            # ("ap ap ap cons x0 x1 x2   =   ap ap x2 x0 x1")
+        ("ap ap ap cons :x0 :x1 :x2", "ap ap :x2 :x0 :x1"),
         ("ap ap ap cons 10 11 add", Number(21)),
         ("ap car ap ap cons 10 11", Number(10)),
         ("ap cdr ap ap cons 10 11", Number(11)),
@@ -120,10 +120,13 @@ if __name__ == '__main__':
             # ap ap ap interact statefulldraw x4 ap ap vec 4 0 = ( x5 , ( [0,0;2,3;1,2;3,2;4,0] ) )
     ]):
         try:
+            expected = test_case[1]
+            if isinstance(expected, str):
+                expected = interpreter.evaluate_expression(expected)
             val = interpreter.evaluate_expression(test_case[0])
-            if not val.equal(test_case[1]):
+            if not val.equal(expected):
                 print(
-                    f"case {i}: `{test_case[0]}`\n\texpected {test_case[1]}\n\tbut      {val}"
+                    f"case {i}: `{test_case[0]}`\n\texpected {expected}\n\tbut      {val}"
                 )
         except Exception as e:
             print(f"case {i}: `{test_case[0]}` exception {e}")

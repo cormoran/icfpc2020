@@ -70,6 +70,35 @@ class Number(Node):
 
 
 @dataclasses.dataclass
+class Variable(Node):
+    ident: str
+    args: typing.List[Node] = dataclasses.field(default_factory=list)
+
+    def ap(self, arg) -> Node:
+        return Variable(self.ident, self.args + [arg])
+
+    def evaluate(self) -> Node:
+        # TODO: get real value from var dict
+        return self
+
+    def equal(self, target):
+        # TODO: get real value from var dict
+        if not isinstance(target, Variable):
+            return False
+        if target.ident != self.ident:
+            return False
+        if len(self.args) != len(target.args):
+            return False
+        for a, b in zip(self.args, target.args):
+            if not a.equal(b):
+                return False
+        return True
+
+    def print(self, indent=0):
+        return '\t' * indent + 'Var(' + self.ident + ')'
+
+
+@dataclasses.dataclass
 class Point:
     x: int
     y: int
@@ -385,6 +414,9 @@ class T(NArgOp):
             return True
         return super().equal(target)
 
+    def print(self, indent=0):
+        return '\t' * indent + 'True'
+
 
 @dataclasses.dataclass
 class F(NArgOp):
@@ -398,6 +430,9 @@ class F(NArgOp):
                 target.args) == 0:
             return True
         return super().equal(target)
+
+    def print(self, indent=0):
+        return '\t' * indent + 'False'
 
 
 @dataclasses.dataclass
