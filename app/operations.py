@@ -19,15 +19,19 @@ def set_parameter(a_server_url, a_query_param):
 
 
 @dataclasses.dataclass
+class Environment:
+    ...
+
+
+@dataclasses.dataclass
 class Node:
 
     # lazy evaluation
-    def ap(self, arg):  # -> Node:
+    def ap(self, env: Environment, arg):  # -> Node:
         raise Exception('cannot ap to', self.__class__.__name__)
 
-    # return Number ?
-    def evaluate(self):  # -> Node:
-        return None
+    def evaluate(self, env: Environment):  # -> Node:
+        return self
 
     # compare all subtree
     def equal(self, target):
@@ -38,15 +42,15 @@ class Node:
 
 
 # evaluate `node` until it's type become `t`
-def evaluate_to_type(node: Node, t: typing.Union[type,
-                                                 typing.List[type]]) -> Node:
+def evaluate_to_type(env: Environment, node: Node,
+                     t: typing.Union[type, typing.List[type]]) -> Node:
     if isinstance(t, list):
         t = tuple(t)
     prev = None
     now = node
     while not isinstance(now, t):
         prev = now
-        now = now.evaluate()
+        now = now.evaluate(env)
         if now == prev:
             raise Exception(
                 f"infinite loop detected in evaluate_to_type({node}, {t})")
@@ -56,9 +60,6 @@ def evaluate_to_type(node: Node, t: typing.Union[type,
 @dataclasses.dataclass
 class Number(Node):
     n: int
-
-    def evaluate(self) -> Node:
-        return self
 
     def equal(self, target):
         if isinstance(target, int):
@@ -74,10 +75,10 @@ class Variable(Node):
     ident: str
     args: typing.List[Node] = dataclasses.field(default_factory=list)
 
-    def ap(self, arg) -> Node:
+    def ap(self, env: Environment, arg: Node) -> Node:
         return Variable(self.ident, self.args + [arg])
 
-    def evaluate(self) -> Node:
+    def evaluate(self, env: Environment) -> Node:
         # TODO: get real value from var dict
         return self
 
@@ -114,9 +115,6 @@ class Picture(Node):
     def add_point(self, x: int, y: int):
         self.points.append(Point(x, y))
 
-    def evaluate(self) -> Node:
-        return self
-
     def equal(self, target):
         if not isinstance(target, Picture):
             return False
@@ -152,9 +150,6 @@ class Picture(Node):
 class Modulated(Node):
     n: str
 
-    def evaluate(self) -> Node:
-        return self
-
     def equal(self, target):
         return isinstance(target, Modulated) and target.n == self.n
 
@@ -165,17 +160,18 @@ class NArgOp(Node):
 
     # n_args: int # abstract field...
 
-    def ap(self, arg) -> Node:
+    def ap(self, env: Environment, arg: Node) -> Node:
         if len(self.args) < self.n_args - 1:
             return self.__class__(self.args + [arg])
         else:
-            return self.__class__(self.args + [arg]).evaluate()
+            return self.__class__(self.args + [arg]).evaluate(env)
 
-    def evaluate(self) -> Node:
-        assert len(self.args) == self.n_args
-        return self._evaluate()
+    def evaluate(self, env: Environment) -> Node:
+        if len(self.args) == self.n_args:
+            return self._evaluate(env)
+        return self  # cannot evaluate now
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         raise NotImplementedError()
 
     # compare all subtree
@@ -201,8 +197,8 @@ class NArgOp(Node):
 class Inc(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
-        n = evaluate_to_type(self.args[0], Number)
+    def _evaluate(self, env: Environment) -> Node:
+        n = evaluate_to_type(env, self.args[0], Number)
         return Number(n.n + 1)
 
 
@@ -210,8 +206,8 @@ class Inc(NArgOp):
 class Dec(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
-        n = evaluate_to_type(self.args[0], Number)
+    def _evaluate(self, env: Environment) -> Node:
+        n = evaluate_to_type(env, self.args[0], Number)
         return Number(n.n - 1)
 
 
@@ -219,9 +215,9 @@ class Dec(NArgOp):
 class Add(NArgOp):
     n_args = 2
 
-    def _evaluate(self) -> Node:
-        n1 = evaluate_to_type(self.args[0], Number)
-        n2 = evaluate_to_type(self.args[1], Number)
+    def _evaluate(self, env: Environment) -> Node:
+        n1 = evaluate_to_type(env, self.args[0], Number)
+        n2 = evaluate_to_type(env, self.args[1], Number)
         return Number(n1.n + n2.n)
 
 
@@ -229,9 +225,9 @@ class Add(NArgOp):
 class Mul(NArgOp):
     n_args = 2
 
-    def _evaluate(self) -> Node:
-        n1 = evaluate_to_type(self.args[0], Number)
-        n2 = evaluate_to_type(self.args[1], Number)
+    def _evaluate(self, env: Environment) -> Node:
+        n1 = evaluate_to_type(env, self.args[0], Number)
+        n2 = evaluate_to_type(env, self.args[1], Number)
         return Number(n1.n * n2.n)
 
 
@@ -239,9 +235,9 @@ class Mul(NArgOp):
 class Div(NArgOp):
     n_args = 2
 
-    def _evaluate(self) -> Node:
-        n1 = evaluate_to_type(self.args[0], Number)
-        n2 = evaluate_to_type(self.args[1], Number)
+    def _evaluate(self, env: Environment) -> Node:
+        n1 = evaluate_to_type(env, self.args[0], Number)
+        n2 = evaluate_to_type(env, self.args[1], Number)
         sign = 1 if n1.n * n2.n >= 0 else -1
         return Number(abs(n1.n) // abs(n2.n) * sign)
 
@@ -250,7 +246,7 @@ class Div(NArgOp):
 class Eq(NArgOp):
     n_args = 2
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         n1 = self.args[0]
         n2 = self.args[1]
         return T() if n1.equal(n2) else F()
@@ -260,9 +256,9 @@ class Eq(NArgOp):
 class Lt(NArgOp):
     n_args = 2
 
-    def _evaluate(self) -> Node:
-        n1 = evaluate_to_type(self.args[0], Number)
-        n2 = evaluate_to_type(self.args[1], Number)
+    def _evaluate(self, env: Environment) -> Node:
+        n1 = evaluate_to_type(env, self.args[0], Number)
+        n2 = evaluate_to_type(env, self.args[1], Number)
         return T() if n1.n < n2.n else F()
 
 
@@ -270,32 +266,33 @@ class Lt(NArgOp):
 class Modulate(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
-        n = evaluate_to_type(self.args[0], [Number, Cons, Nil])
-        return Modulated(self._modulate_node(n))
+    def _evaluate(self, env: Environment) -> Node:
+        n = evaluate_to_type(env, self.args[0], [Number, Cons, Nil])
+        return Modulated(self._modulate_node(env, n))
 
-    def _modulate_node(self, node: Node):
+    def _modulate_node(self, env: Environment, node: Node):
         if isinstance(node, Number):
             return modulate.modulate_number(node.n)
         elif isinstance(node, Nil):
             return "00"
         elif isinstance(node, Cons):
-            return self._evaluate_cons(node)
+            return self._evaluate_cons(env, node)
         else:
             raise Exception(f"modulate: unsupported Node {node}")
 
-    def _evaluate_cons(self, cons: Node):
-        n1 = evaluate_to_type(cons.args[0], [Number, Cons, Nil])
-        n2 = evaluate_to_type(cons.args[1], [Number, Cons, Nil])
-        return "11" + self._modulate_node(n1) + self._modulate_node(n2)
+    def _evaluate_cons(self, env: Environment, cons: Node):
+        n1 = evaluate_to_type(env, cons.args[0], [Number, Cons, Nil])
+        n2 = evaluate_to_type(env, cons.args[1], [Number, Cons, Nil])
+        return "11" + self._modulate_node(env, n1) + self._modulate_node(
+            env, n2)
 
 
 @dataclasses.dataclass
 class Demodulate(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
-        n = evaluate_to_type(self.args[0], Modulated)
+    def _evaluate(self, env: Environment) -> Node:
+        n = evaluate_to_type(env, self.args[0], Modulated)
         node, left = self._demodulate(n.n)
         if len(left) != 0:
             print(left)
@@ -321,9 +318,9 @@ class Demodulate(NArgOp):
 class Send(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         n = Ap(Modulate(), self.args[0])
-        n = evaluate_to_type(n, Modulated)
+        n = evaluate_to_type(env, n, Modulated)
         print('* [Human -> Alien]', n.n)
         res = requests.post(server_url + '/aliens/send' + query_param, n.n)
         if res.status_code != 200:
@@ -332,15 +329,15 @@ class Send(NArgOp):
             print('Response body:', res.text)
             raise Exception('Unexpected server response:')
         print('* [Alien -> Human]', res.text)
-        return Ap(Demodulate(), Modulated(res.text)).evaluate()
+        return Ap(Demodulate(), Modulated(res.text)).evaluate(env)
 
 
 @dataclasses.dataclass
 class Neg(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
-        n = evaluate_to_type(self.args[0], Number)
+    def _evaluate(self, env: Environment) -> Node:
+        n = evaluate_to_type(env, self.args[0], Number)
         return Number(-n.n)
 
 
@@ -349,12 +346,14 @@ class Ap(Node):
     func: typing.Optional[Node]
     arg: typing.Optional[Node]
 
-    def ap(self, arg):
-        return self.evaluate().ap(arg)
+    def ap(self, env: Environment, arg: Node):
+        # TODO
+        return self.evaluate(env).ap(env, arg)
 
     # return func or value
-    def evaluate(self) -> Node:
-        return self.func.ap(self.arg)
+    def evaluate(self, env: Environment) -> Node:
+        # TODO
+        return self.func.ap(env, self.arg)
 
     # compare all subtree
     def equal(self, target):
@@ -375,8 +374,7 @@ class Ap(Node):
 class S(NArgOp):
     n_args = 3
 
-    def _evaluate(self) -> Node:
-        # TODO: 知らんぞ
+    def _evaluate(self, env: Environment) -> Node:
         a = Ap(self.args[0], self.args[2])
         b = Ap(self.args[1], self.args[2])
         return Ap(a, b)
@@ -386,7 +384,7 @@ class S(NArgOp):
 class C(NArgOp):
     n_args = 3
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         a = Ap(self.args[0], self.args[2])
         return Ap(a, self.args[1])
 
@@ -395,8 +393,7 @@ class C(NArgOp):
 class B(NArgOp):
     n_args = 3
 
-    def _evaluate(self) -> Node:
-        # TODO: 知らんぞ
+    def _evaluate(self, env: Environment) -> Node:
         a = Ap(self.args[1], self.args[2])
         return Ap(self.args[0], a)
 
@@ -405,7 +402,7 @@ class B(NArgOp):
 class T(NArgOp):
     n_args = 2
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         return self.args[0]
 
     def equal(self, target):
@@ -422,7 +419,7 @@ class T(NArgOp):
 class F(NArgOp):
     n_args = 2
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         return self.args[1]
 
     def equal(self, target):
@@ -439,8 +436,8 @@ class F(NArgOp):
 class Pwr2(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
-        n = evaluate_to_type(self.args[0], Number)
+    def _evaluate(self, env: Environment) -> Node:
+        n = evaluate_to_type(env, self.args[0], Number)
         return Number(2**n.n)
 
 
@@ -448,7 +445,7 @@ class Pwr2(NArgOp):
 class I(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         return self.args[0]
 
 
@@ -456,7 +453,7 @@ class I(NArgOp):
 class Cons(NArgOp):
     n_args = 3
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         a = Ap(self.args[2], self.args[0])
         return Ap(a, self.args[1])
 
@@ -468,7 +465,10 @@ class Cons(NArgOp):
         while isinstance(cons, Cons) and len(cons.args) == 2:
             res += cons.args[0].print() + ' , '
             cons = cons.args[1]
-        res += cons.print()
+        if not isinstance(cons, Nil):
+            res += cons.print()
+        else:
+            res = res[:-3]  # remove ` , `
         res += ')'
         return res
 
@@ -477,8 +477,8 @@ class Cons(NArgOp):
 class Car(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
-        arg = evaluate_to_type(self.args[0], Cons)
+    def _evaluate(self, env: Environment) -> Node:
+        arg = evaluate_to_type(env, self.args[0], Cons)
         assert len(arg.args) <= 2
         return arg.args[0]  # TODO: evaluate?
 
@@ -487,8 +487,8 @@ class Car(NArgOp):
 class Cdr(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
-        arg = evaluate_to_type(self.args[0], Cons)
+    def _evaluate(self, env: Environment) -> Node:
+        arg = evaluate_to_type(env, self.args[0], Cons)
         assert len(arg.args) == 2
         return arg.args[1]  # TODO: evaluate?
 
@@ -497,7 +497,7 @@ class Cdr(NArgOp):
 class Nil(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         if len(self.args) == 0:
             return self
         return T()
@@ -516,11 +516,11 @@ class Nil(NArgOp):
 class IsNil(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         # TODO: これでいいのか？
         n = self.args[0]
         while isinstance(n, Ap):
-            n = n.evaluate()
+            n = n.evaluate(env)
         return T() if isinstance(n, Nil) else F()
 
 
@@ -528,15 +528,15 @@ class IsNil(NArgOp):
 class Draw(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         picture = Picture()
-        arg = evaluate_to_type(self.args[0], [Cons, Nil])
+        arg = evaluate_to_type(env, self.args[0], [Cons, Nil])
         while isinstance(arg, Cons):
-            pair = evaluate_to_type(arg.args[0], [Cons, Nil])
-            x = evaluate_to_type(pair.args[0], Number)
-            y = evaluate_to_type(pair.args[1], Number)
+            pair = evaluate_to_type(env, arg.args[0], [Cons, Nil])
+            x = evaluate_to_type(env, pair.args[0], Number)
+            y = evaluate_to_type(env, pair.args[1], Number)
             picture.add_point(x.n, y.n)
-            arg = evaluate_to_type(arg.args[1], [Cons, Nil])
+            arg = evaluate_to_type(env, arg.args[1], [Cons, Nil])
         return picture
 
 
@@ -544,8 +544,8 @@ class Draw(NArgOp):
 class MultipleDraw(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
-        n = evaluate_to_type(self.args[0], [Nil, Cons])
+    def _evaluate(self, env: Environment) -> Node:
+        n = evaluate_to_type(env, self.args[0], [Nil, Cons])
         if isinstance(n, Nil):
             return n
         elif isinstance(n, Cons):
@@ -559,8 +559,8 @@ class MultipleDraw(NArgOp):
 class If0(NArgOp):
     n_args = 3
 
-    def _evaluate(self) -> Node:
-        condition = evaluate_to_type(self.args[0],
+    def _evaluate(self, env: Environment) -> Node:
+        condition = evaluate_to_type(env, self.args[0],
                                      Number)  # TODO: 実は number でなくてもよいかも
         return self.args[1 if condition.n == 0 else 2]
 
@@ -569,7 +569,7 @@ class If0(NArgOp):
 class Modem(NArgOp):
     n_args = 1
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         return Ap(Demodulate(), Ap(Modulate(), self.args[0]))
 
 
@@ -578,7 +578,7 @@ class F38(NArgOp):
     n_args = 2
 
     # "ap ap f38 x2 x0 = ap ap ap if0 ap car x0 ( ap modem ap car ap cdr x0 , ap multipledraw ap car ap cdr ap cdr x0 ) ap ap ap interact x2 ap modem ap car ap cdr x0 ap send ap car ap cdr ap cdr x0"
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         x2 = self.args[0]  # protocol
         x0 = self.args[1]  # (flag, newState, data)
         # ( ap modem ap car ap cdr x0 , ap multipledraw ap car ap cdr ap cdr x0 )
@@ -607,7 +607,7 @@ class Interact(NArgOp):
     n_args = 3
 
     # "ap ap ap interact x2 x4 x3 = ap ap f38 x2 ap ap x2 x4 x3"
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         x2 = self.args[0]  # protocol: function (state, vector) -> value
         x4 = self.args[1]  # state
         x3 = self.args[2]  # vector
@@ -620,7 +620,7 @@ class StatelessDraw(NArgOp):
     n_args = 2
 
     # ap ap c ap ap b b ap ap b ap b ap cons 0 ap ap c ap ap b b cons ap ap c cons nil ap ap c ap ap b cons ap ap c cons nil nil
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         if isinstance(self.args[0], Nil):
             return make_list(
                 [Number(0),
@@ -647,7 +647,7 @@ class StatelessDraw(NArgOp):
 class StatefullDraw(NArgOp):
     n_args = 2
 
-    def _evaluate(self) -> Node:
+    def _evaluate(self, env: Environment) -> Node:
         # ap ap statefulldraw x0 x1 = ( 0 , ap ap cons x1 x0 , ( ap ap cons x1 x0 ) )
         # statefulldraw = ap ap b ap b ap ap s ap ap b ap b ap cons 0 ap ap c ap ap b b cons ap ap c cons nil ap ap c cons nil ap c cons
         raise NotImplementedError()

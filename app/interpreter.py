@@ -10,11 +10,11 @@ from operations import *
 
 # evaluate all ap nodes on ast
 # returns ast which **does not** include `ap`
-def evaluate_all_ap(node: Node):
+def evaluate_all_ap(env: Environment, node: Node):
     while isinstance(node, Ap):
-        node = node.evaluate()
+        node = node.evaluate(env)
     if isinstance(node, NArgOp):
-        node.args = list(map(evaluate_all_ap, node.args))
+        node.args = list(map(lambda a: evaluate_all_ap(env, a), node.args))
     return node
 
 
@@ -37,7 +37,7 @@ class Interpreter():
 
     def _evaluate_expression(self, expression_tokens: typing.List[str]):
         root, _ = self._build(0, expression_tokens)
-        return evaluate_all_ap(root)
+        return evaluate_all_ap(Environment(), root)
 
     def _build(self, i, tokens):
         if tokens[i] == "ap":
