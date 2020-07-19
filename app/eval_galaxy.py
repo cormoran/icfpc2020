@@ -26,9 +26,15 @@ with open('./app/galaxy.txt', 'r') as f:
     #     interpreter.evaluate_expression(
     #         "ap ap ap interact galaxy nil ap ap vec 0 0").print())
 
-    res = interpreter.evaluate_expression(
-        "ap ap ap interact galaxy nil ap ap vec 1 1")
-    newState = get(0, res)
-    image = get(1, res)
-    print(evaluate_all(interpreter.env, get(0, image)).print())
-    print(evaluate_all(interpreter.env, get(1, image)).print())
+    current_state = "nil"
+    for i in range(10):
+        res = interpreter.evaluate_expression(
+            f"ap ap ap interact galaxy {current_state} ap ap vec 0 0 ")
+        newState = get(0, res)
+        image = get(1, res)
+        interpreter.register_variable(f"state{i}", newState)
+        current_state = f"state{i}"
+        print(evaluate_all(interpreter.env, image, True).print())
+        # print(evaluate_all(interpreter.env, get(0, image)).print())
+        # print(image)
+        # print(evaluate_all(interpreter.env, get(1, image)).print())

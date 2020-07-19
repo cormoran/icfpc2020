@@ -75,7 +75,7 @@ class Variable(Node):
             return self
         for arg in self.args:
             node = Ap(node, arg)
-        return node
+        return node.evaluate(env)
 
     def __eq__(self, target):
         # TODO: get real value from var dict
