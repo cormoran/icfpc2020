@@ -92,7 +92,7 @@ class GameResponse:
 
 
 def accelerateCommand(shipId: int, vector: typing.Tuple[int, int]) -> str:
-    return f"( 0 , {shipId} , ( {vector[0]} , {vector[1]} ) )"
+    return f"( 0 , {shipId} , ap ap vec {vector[0]} {vector[1]} )"
 
 
 def detonateCommand(shipId: int) -> str:
@@ -100,7 +100,7 @@ def detonateCommand(shipId: int) -> str:
 
 
 def shootCommand(shipId: int, target: typing.Tuple[int, int], x3) -> str:
-    return f"( 2 , {shipId} , ( {target[0]} , {target[1]} ) , {x3} )"
+    return f"( 2 , {shipId} , ap ap vec {target[0]} {target[1]} , {x3} )"
 
 
 def print_game_response(response) -> GameResponse:
@@ -148,7 +148,8 @@ def main():
     for i in range(10000):
         res = print_game_response(
             interpreter.evaluate_expression(
-                f"ap send ( 4 , {player_key} , nil )"))
+                f"ap send ( 4 , {player_key} , ( {accelerateCommand(0, (0, 0))} ) )"
+            ))
         if res.success == 0:
             break
         if res.gameStage == 2:
