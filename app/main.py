@@ -3,6 +3,7 @@ import sys
 import math
 import os
 import dataclasses
+import typing
 
 from interpreter import Interpreter
 import operations as op
@@ -89,6 +90,18 @@ class GameResponse:
         self.gameState = GameState(get(3, node))
 
 
+def accelerateCommand(shipId: int, vector: typing.Tuple[int, int]) -> str:
+    return f"( 0 , {shipId} , ( {vector[0]} , {vector[1]} )"
+
+
+def detonateCommand(shipId: int) -> str:
+    return f"( 1 , {shipId} )"
+
+
+def shootCommand(shipId: int, target: typing.Tuple[int, int], x3) -> str:
+    return f"( 2 , {shipId} , ( {target[0]} , {target[1]} ) , {x3} )"
+
+
 def print_game_response(response):
     gresponse = GameResponse(response)
     print(gresponse)
@@ -124,9 +137,18 @@ def main():
     print_game_response(
         interpreter.evaluate_expression(
             f"ap send ( 3 , {player_key} , ( 1 , 2 , 3 , 4 ) )"))
-
+    print('accelarate')
     print_game_response(
-        interpreter.evaluate_expression(f"ap send ( 4 , {player_key} , nil )"))
+        interpreter.evaluate_expression(
+            f"ap send ( 4 , {player_key} , {accelerateCommand(1, (1, 1))} )"))
+    print('detonate')
+    print_game_response(
+        interpreter.evaluate_expression(
+            f"ap send ( 4 , {player_key} , {detonateCommand(1)} )"))
+    print('shoot')
+    print_game_response(
+        interpreter.evaluate_expression(
+            f"ap send ( 4 , {player_key} , {shootCommand(1, (1, 1), 1)} )"))
 
 
 if __name__ == '__main__':
