@@ -461,9 +461,11 @@ class Cons(NArgOp):
         return Ap(a, self.args[1])
 
     def print(self, indent=0):
+        if len(self.args) < 2:
+            return super().print(indent)
         res = '\t' * indent + '('
         cons = self
-        while isinstance(cons, Cons):
+        while isinstance(cons, Cons) and len(cons.args) == 2:
             res += cons.args[0].print() + ' , '
             cons = cons.args[1]
         res += cons.print()
