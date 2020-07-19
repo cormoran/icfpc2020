@@ -4,6 +4,7 @@ import math
 import os
 import dataclasses
 import typing
+import time
 
 from interpreter import Interpreter
 import operations as op
@@ -102,9 +103,10 @@ def shootCommand(shipId: int, target: typing.Tuple[int, int], x3) -> str:
     return f"( 2 , {shipId} , ( {target[0]} , {target[1]} ) , {x3} )"
 
 
-def print_game_response(response):
+def print_game_response(response) -> GameResponse:
     gresponse = GameResponse(response)
     print(gresponse)
+    return gresponse
 
 
 def main():
@@ -115,21 +117,27 @@ def main():
     print('ServerUrl: %s; PlayerKey: %s' % (server_url, player_key))
 
     op.set_parameter(
-        server_url, '' if not dev_mode else
+        server_url, '' if os.environ.get("API_KEY", "") == "" else
         ("?apiKey=" + os.environ.get("API_KEY", "")))
 
     interpreter = Interpreter()
 
     if dev_mode:
-        res = interpreter.evaluate_expression("ap send ( 1 )")
+        res = interpreter.evaluate_expression("ap send ( 1 , 0 )")
         print(res)
         if not isinstance(res, op.Cons) or res.args[0] != op.Number(1):
             raise Exception("failed to CREATE player_key")
-        attacker_player_key = get(1, get(0, get(1, res)))
-        defender_player_key = get(1, get(1, get(1, res)))
-        print(attacker_player_key)
-        print(defender_player_key)
-        exit(0)
+        attacker_player_key = str(get(1, get(0, get(1, res))).n)
+        defender_player_key = str(get(1, get(1, get(1, res))).n)
+        print('attacker', attacker_player_key)
+        print('defender', defender_player_key)
+
+        if dev_mode == "attack":
+            player_key = attacker_player_key
+            print('attacker mode')
+        else:
+            player_key = defender_player_key
+            print('defender mode')
 
     print_game_response(
         interpreter.evaluate_expression(f"ap send ( 2 , {player_key} , ( ) )"))
@@ -137,18 +145,27 @@ def main():
     print_game_response(
         interpreter.evaluate_expression(
             f"ap send ( 3 , {player_key} , ( 1 , 2 , 3 , 4 ) )"))
-    print('accelarate')
-    print_game_response(
-        interpreter.evaluate_expression(
-            f"ap send ( 4 , {player_key} , {accelerateCommand(0, (1, 1))} )"))
-    print('detonate')
-    print_game_response(
-        interpreter.evaluate_expression(
-            f"ap send ( 4 , {player_key} , {detonateCommand(0)} )"))
-    print('shoot')
-    print_game_response(
-        interpreter.evaluate_expression(
-            f"ap send ( 4 , {player_key} , {shootCommand(0, (1, 1), 1)} )"))
+    for i in range(10000):
+        res = print_game_response(
+            interpreter.evaluate_expression(
+                f"ap send ( 4 , {player_key} , nil )"))
+        if res.success == 0:
+            break
+        if res.gameStage == 2:
+            break
+        time.sleep(0.1)
+    # print('accelarate')
+    # print_game_response(
+    #     interpreter.evaluate_expression(
+    #         f"ap send ( 4 , {player_key} , {accelerateCommand(0, (1, 1))} )"))
+    # print('detonate')
+    # print_game_response(
+    #     interpreter.evaluate_expression(
+    #         f"ap send ( 4 , {player_key} , {detonateCommand(0)} )"))
+    # print('shoot')
+    # print_game_response(
+    #     interpreter.evaluate_expression(
+    #         f"ap send ( 4 , {player_key} , {shootCommand(0, (1, 1), 1)} )"))
 
 
 if __name__ == '__main__':
