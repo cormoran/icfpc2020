@@ -125,7 +125,7 @@ def test_v1():
             if isinstance(expected, str):
                 expected = interpreter.evaluate_expression(expected)
             val = interpreter.evaluate_expression(test_case[0])
-            if not val.equal(expected):
+            if val != expected:
                 print(
                     f"case {i}: `{test_case[0]}`\n\texpected {expected}\n\tbut      {val}"
                 )
@@ -147,7 +147,7 @@ def test_v2():
             try:
                 left_node = interpreter.evaluate_expression(left)
                 right_node = interpreter.evaluate_expression(right)
-                if not left_node.equal(right_node):
+                if left_node != right_node:
                     print(f"line {i+1}: `{line}`")
                     print(f"\texpected {right_node.print()}")
                     print(f"\tbut      {left_node.print()}")
