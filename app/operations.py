@@ -58,26 +58,59 @@ class Number(Node):
         return self
 
     def equal(self, target):
+        if isinstance(target, int):
+            return self.n == target
         return isinstance(target, Number) and target.n == self.n
 
 
 @dataclasses.dataclass
-class Picture(Node):
-    @dataclasses.dataclass
-    class Point:
-        x: int
-        y: int
+class Point:
+    x: int
+    y: int
 
+    def __lt__(self, other):
+        return self.x < other.x if self.x != other.x else self.y < other.y
+
+
+@dataclasses.dataclass
+class Picture(Node):
     points: typing.List[Point] = dataclasses.field(default_factory=list)
 
-    def add_point(self, x, y):
-        self.points.append(self.Point(x, y))
+    def add_point(self, x: int, y: int):
+        self.points.append(Point(x, y))
 
     def evaluate(self) -> Node:
         return self
 
     def equal(self, target):
-        return False
+        if not isinstance(target, Picture):
+            return False
+        if len(self.points) != len(target.points):
+            return False
+        # TODO: 破壊的変更をしている
+        self.points = sorted(self.points)
+        target.points = sorted(target.points)
+        for p1, p2 in zip(self.points, target.points):
+            if p1.x != p2.x or p1.y != p2.y:
+                return False
+        return True
+
+    def print(self):
+        min_x, max_x = 0, 0
+        min_y, max_y = 0, 0
+        for p in self.points:
+            min_x = min(min_x, p.x)
+            max_x = max(max_x, p.x)
+            min_y = min(min_y, p.y)
+            max_y = max(max_y, p.y)
+        canvas = [['.' for x in range(max_x - min_x + 1)]
+                  for y in range(max_y - min_y + 1)]
+        for p in self.points:
+            canvas[p.y][p.x] = '#'
+        for line in canvas:
+            print()
+            print(''.join(line))
+            print()
 
 
 @dataclasses.dataclass
@@ -425,10 +458,15 @@ class Draw(NArgOp):
     n_args = 1
 
     def _evaluate(self) -> Node:
-        arg = evaluate_to_type(self.args[0], [Cons, Nil])
         picture = Picture()
-        # TODO: add points
-        return Picture()
+        arg = evaluate_to_type(self.args[0], [Cons, Nil])
+        while isinstance(arg, Cons):
+            pair = evaluate_to_type(arg.args[0], [Cons, Nil])
+            x = evaluate_to_type(pair.args[0], Number)
+            y = evaluate_to_type(pair.args[1], Number)
+            picture.add_point(x.n, y.n)
+            arg = evaluate_to_type(arg.args[1], [Cons, Nil])
+        return picture
 
 
 @dataclasses.dataclass

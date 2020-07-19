@@ -73,14 +73,16 @@ if __name__ == '__main__':
                               Cons([Number(11), Nil()])])),
             # 32 Draw
         ("ap draw ( )", Picture()),
-        ("ap draw ( ap ap vec 1 1 )", Picture()),
-        ("ap draw ( ap ap vec 1 2 )", Picture()),
-        ("ap draw ( ap ap vec 1 5 )", Picture()),
-        ("ap draw ( ap ap vec 1 1 , ap ap vec 3 1 )", Picture()),
+        ("ap draw ( ap ap vec 1 1 )", Picture([Point(1, 1)])),
+        ("ap draw ( ap ap vec 1 2 )", Picture([Point(1, 2)])),
+        ("ap draw ( ap ap vec 1 5 )", Picture([Point(1, 5)])),
+        ("ap draw ( ap ap vec 1 1 , ap ap vec 3 1 )",
+         Picture([Point(1, 1), Point(3, 1)])),
             # 34 Multiple Draw
         ("ap multipledraw nil", Nil()),
-        ("ap multipledraw ap ap cons ap ap vec 1 1 ap ap cons ap ap vec 2 2 nil",
-         make_list([Picture(), Picture()])),
+        ("ap multipledraw ( ( ap ap vec 1 2 ) , ( ap ap vec 3 4 ) )",
+         make_list([Picture([Point(1, 2)]),
+                    Picture([Point(3, 4)])])),
             # 35 Modulate List
         ("ap mod nil", Modulated("00")),
         ("ap mod ap ap cons nil nil", Modulated("110000")),
@@ -109,7 +111,7 @@ if __name__ == '__main__':
             # 40 Stateless Drawing Protocol
             # TODO: ( nil , ( [1,0] ) ) になってほしいけど ( ) が少ない気がする...
         ("ap ap ap interact statelessdraw nil ap ap vec 1 0",
-         make_list([Nil(), Picture()])),
+         make_list([Nil(), Picture([Point(1, 0)])])),
             # 41 Statefull Drawing Protocol
             # ap ap ap interact statefulldraw nil ap ap vec 0 0 = ( ( ap ap vec 0 0 ) , ( [0,0] ) )
             # ap ap ap interact statefulldraw ( ap ap vec 0 0 ) ap ap vec 2 3 = ( x2 , ( [0,0;2,3] ) )
