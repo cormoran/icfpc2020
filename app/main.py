@@ -91,7 +91,7 @@ class GameResponse:
 
 
 def accelerateCommand(shipId: int, vector: typing.Tuple[int, int]) -> str:
-    return f"( 0 , {shipId} , ( {vector[0]} , {vector[1]} )"
+    return f"( 0 , {shipId} , ( {vector[0]} , {vector[1]} ) )"
 
 
 def detonateCommand(shipId: int) -> str:
