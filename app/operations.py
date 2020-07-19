@@ -134,11 +134,12 @@ class Picture(Node):
         canvas = [['.' for x in range(max_x - min_x + 1)]
                   for y in range(max_y - min_y + 1)]
         for p in self.points:
-            canvas[p.y][p.x] = '#'
-        res = '\t' * indent + 'Picture(\n'
+            canvas[p.y - min_y][p.x - min_x] = '#'
+        res = ""
+        # res = '\t' * indent + 'Picture(\n'
         for line in canvas:
             res += '\t' * indent + ''.join(line) + '\n'
-        res += '\t' * indent + ')'
+        # res += '\t' * indent + ')'
         return res
 
 
@@ -672,9 +673,10 @@ class If0(NArgOp):
 
     def _evaluate(self, env: Environment) -> Node:
         condition = self.args[0].evaluate(env)
+        self.args[0] = condition
         if isinstance(condition, Number):
             return self.args[1 if condition.n == 0 else 2].evaluate(env)
-        return If0([condition] + self.args[1:])
+        return self
 
 
 @dataclasses.dataclass
