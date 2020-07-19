@@ -11,6 +11,13 @@ query_param = "?apiKey=" + os.environ.get("API_KEY")
 import modulate
 
 
+def set_parameter(a_server_url, a_query_param):
+    global server_url
+    global query_param
+    server_url = a_server_url
+    query_param = a_query_param
+
+
 @dataclasses.dataclass
 class Node:
 
