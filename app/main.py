@@ -140,15 +140,15 @@ def main():
     print('accelarate')
     print_game_response(
         interpreter.evaluate_expression(
-            f"ap send ( 4 , {player_key} , {accelerateCommand(1, (1, 1))} )"))
+            f"ap send ( 4 , {player_key} , {accelerateCommand(0, (1, 1))} )"))
     print('detonate')
     print_game_response(
         interpreter.evaluate_expression(
-            f"ap send ( 4 , {player_key} , {detonateCommand(1)} )"))
+            f"ap send ( 4 , {player_key} , {detonateCommand(0)} )"))
     print('shoot')
     print_game_response(
         interpreter.evaluate_expression(
-            f"ap send ( 4 , {player_key} , {shootCommand(1, (1, 1), 1)} )"))
+            f"ap send ( 4 , {player_key} , {shootCommand(0, (1, 1), 1)} )"))
 
 
 if __name__ == '__main__':

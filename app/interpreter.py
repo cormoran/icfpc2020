@@ -10,15 +10,17 @@ from operations import *
 
 # evaluate all ap nodes on ast
 # returns ast which **does not** include `ap`
-def evaluate_all(env: Environment, node: Node):
+def evaluate_all(env: Environment, node: Node, include_list=False):
     prev = node
     while True:
         node = node.evaluate(env)
         if prev == node:
             break
         prev = node
-    if isinstance(node, NArgOp):
-        node.args = list(map(lambda a: evaluate_all(env, a), node.args))
+    if include_list:
+        if isinstance(node, NArgOp):
+            node.args = list(
+                map(lambda a: evaluate_all(env, a, include_list), node.args))
     return node
 
 
