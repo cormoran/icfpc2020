@@ -16,15 +16,15 @@ def get(index: int, node: op.Cons):
 
 @dataclasses.dataclass
 class StaticGameInfo:
-    x0: op.Node
-    role: op.Node
-    x2: op.Node
-    x3: op.Node
-    x4: op.Node
+    x0: int = None
+    role: int = None
+    x2: op.Node = None
+    x3: op.Node = None
+    x4: op.Node = None
 
     def __init__(self, node: op.Node):
-        self.x0 = get(0, node)
-        self.role = get(1, node)
+        self.x0 = get(0, node).n
+        self.role = get(1, node).n
         self.x2 = get(2, node)
         self.x3 = get(3, node)
         self.x4 = get(4, node)
@@ -32,14 +32,14 @@ class StaticGameInfo:
 
 @dataclasses.dataclass
 class Ship:
-    role: op.Node
-    shipId: op.Node
-    position: op.Node
-    velocity: op.Node
-    x4: op.Node
-    x5: op.Node
-    x6: op.Node
-    x7: op.Node
+    role: op.Node = None
+    shipId: op.Node = None
+    position: op.Node = None
+    velocity: op.Node = None
+    x4: op.Node = None
+    x5: op.Node = None
+    x6: op.Node = None
+    x7: op.Node = None
 
     def __init__(self, node: op.Node):
         self.role = get(0, node)
@@ -54,9 +54,9 @@ class Ship:
 
 @dataclasses.dataclass
 class GameState:
-    gameTick: op.Node
-    x1: op.Node
-    shipAndCommands: op.Node
+    gameTick: op.Node = None
+    x1: op.Node = None
+    shipAndCommands: op.Node = None
 
     def __init__(self, node: op.Node):
         if isinstance(node, op.Nil):
@@ -76,15 +76,15 @@ class GameState:
 
 @dataclasses.dataclass
 class GameResponse:
-    success: op.Node
-    gameStage: op.Node
-    staticGameInfo: StaticGameInfo
+    success: int = None
+    gameStage: int = None
+    staticGameInfo: StaticGameInfo = None
 
     def __init__(self, node: op.Node):
-        self.success = get(0, node)
-        if self.success != op.Number(1):
+        self.success = get(0, node).n
+        if self.success != 1:
             return
-        self.gameStage = get(1, node)
+        self.gameStage = get(1, node).n
         self.staticGameInfo = StaticGameInfo(get(2, node))
         self.gameState = GameState(get(3, node))
 
@@ -112,12 +112,8 @@ def main():
         print(res)
         if not isinstance(res, op.Cons) or res.args[0] != op.Number(1):
             raise Exception("failed to CREATE player_key")
-        attacker_player_key = op.Ap(
-            op.Car(), op.Ap(op.Cdr(), op.Ap(op.Car(), op.Ap(op.Cdr(), res))))
-        defender_player_key = op.Ap(
-            op.Car(),
-            op.Ap(op.Cdr(),
-                  op.Ap(op.Car(), op.Ap(op.Cdr(), op.Ap(op.Cdr(), res)))))
+        attacker_player_key = get(1, get(0, get(1, res)))
+        defender_player_key = get(1, get(1, get(1, res)))
         print(attacker_player_key)
         print(defender_player_key)
         exit(0)
@@ -130,7 +126,7 @@ def main():
             f"ap send ( 3 , {player_key} , ( 1 , 2 , 3 , 4 ) )"))
 
     print_game_response(
-        interpreter.evaluate_expression(f"ap send ( 4 , {player_key} , ( ) )"))
+        interpreter.evaluate_expression(f"ap send ( 4 , {player_key} , nil )"))
 
 
 if __name__ == '__main__':
