@@ -34,8 +34,8 @@ class StaticGameInfo:
 
 @dataclasses.dataclass
 class Ship:
-    role: op.Node = None
-    shipId: op.Node = None
+    role: int = None
+    shipId: int = None
     position: op.Node = None
     velocity: op.Node = None
     x4: op.Node = None
@@ -44,10 +44,12 @@ class Ship:
     x7: op.Node = None
 
     def __init__(self, node: op.Node):
-        self.role = get(0, node)
-        self.shipId = get(1, node)
-        self.position = get(2, node)
-        self.velocity = get(3, node)
+        self.role = get(0, node).n
+        self.shipId = get(1, node).n
+        pos = get(2, node)
+        self.position = (pos.args[0].n, pos.args[1].n)
+        vel = get(3, node)
+        self.velocity = (vel.args[0].n, vel.args[1].n)
         self.x4 = get(4, node)
         self.x5 = get(5, node)
         self.x6 = get(6, node)
@@ -81,6 +83,7 @@ class GameResponse:
     success: int = None
     gameStage: int = None
     staticGameInfo: StaticGameInfo = None
+    gameState: GameState = None
 
     def __init__(self, node: op.Node):
         self.success = get(0, node).n

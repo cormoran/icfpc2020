@@ -399,14 +399,14 @@ class Send(NArgOp):
         n = Ap(Modulate(), self.args[0]).evaluate(env)
         self.args[0] = n
         if isinstance(n, Modulated):
-            print('* [Human -> Alien]', n.n)
+            # print('* [Human -> Alien]', n.n)
             res = requests.post(server_url + '/aliens/send' + query_param, n.n)
             if res.status_code != 200:
                 print('Unexpected server response:')
                 print('HTTP code:', res.status_code)
                 print('Response body:', res.text)
                 raise Exception('Unexpected server response:')
-            print('* [Alien -> Human]', res.text)
+            # print('* [Alien -> Human]', res.text)
             return Ap(Demodulate(), Modulated(res.text)).evaluate(env)
         return self
 
