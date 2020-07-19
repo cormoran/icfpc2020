@@ -28,7 +28,7 @@ class Interpreter():
         var_name = tokens[0]
         assert var_name not in self.var_dict
         self.var_dict[var_name] = self._evaluate_expression(tokens[2:])
-        print(f"{var_name} = {self.var_dict[var_name]}")
+        print(f"{var_name} = {self.var_dict[var_name].print()}")
 
     # evaluate expression such as `ap inc 0`
     # and returns ast root node
