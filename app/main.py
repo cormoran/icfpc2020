@@ -61,6 +61,7 @@ class GameState:
     gameTick: op.Node = None
     x1: op.Node = None
     shipAndCommands: op.Node = None
+    ship: Ship = None
 
     def __init__(self, node: op.Node):
         if isinstance(node, op.Nil):
@@ -74,6 +75,7 @@ class GameState:
             return []
         shipAndCommand = get(0, node)
         ship = Ship(get(0, shipAndCommand))
+        self.ship = ship
         appliedCommands = get(1, shipAndCommand)
         return [(ship, appliedCommands)]
 
@@ -111,6 +113,12 @@ def print_game_response(response) -> GameResponse:
     print(gresponse)
     return gresponse
 
+def decideAccelerateVector(velocity: typing.Tuple[int, int]) -> typing.Tuple[int, int]:
+    if velocity[0] == 0 and velocity[1] == 0:
+        return (1, -1)
+    ax = -1 if velocity[0] >= 0 else 1
+    ay = -1 if velocity[1] >= 0 else 1
+    return (ax, ay)
 
 def main():
     server_url = sys.argv[1]
@@ -145,14 +153,28 @@ def main():
     print_game_response(
         interpreter.evaluate_expression(f"ap send ( 2 , {player_key} , ( ) )"))
 
-    print_game_response(
+    res = print_game_response(
         interpreter.evaluate_expression(
             f"ap send ( 3 , {player_key} , ( 1 , 2 , 3 , 4 ) )"))
+    role   = res.staticGameInfo.role
+    shipId = res.gameState.ship.shipId
+    sx, sy = res.gameState.ship.position
+    vx, vy = res.gameState.ship.velocity
+
     for i in range(10000):
-        res = print_game_response(
-            interpreter.evaluate_expression(
-                f"ap send ( 4 , {player_key} , ( {accelerateCommand(0, (1, -1))} , {shootCommand(0, (1, 1), 1) } ) )"
-            ))
+        (ax, ay) = decideAccelerateVector((vx, vy))
+        if role == 0: # attacker
+            res = print_game_response(
+                interpreter.evaluate_expression(
+                    f"ap send ( 4 , {player_key} , ( {accelerateCommand(shipId, (vx, vy))} , {shootCommand(shipId, (-sx, -sy), 1) } ) )"
+                ))
+        else: # defender
+            res = print_game_response(
+                interpreter.evaluate_expression(
+                    f"ap send ( 4 , {player_key} , ( {accelerateCommand(shipId, (vx, vy))} , {shootCommand(shipId, (1, 1), 1) } ) )"
+                ))
+        vx, vy = res.gameState.ship.velocity # Update velocity
+
         if res.success == 0:
             break
         if res.gameStage == 2:
