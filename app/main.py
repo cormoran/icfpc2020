@@ -77,6 +77,7 @@ class GameState:
         ship = Ship(get(0, shipAndCommand))
         self.ship = ship
         appliedCommands = get(1, shipAndCommand)
+        print("**appliedCommands**", appliedCommands)
         return [(ship, appliedCommands)]
 
 
