@@ -151,7 +151,7 @@ def main():
     for i in range(10000):
         res = print_game_response(
             interpreter.evaluate_expression(
-                f"ap send ( 4 , {player_key} , {accelerateCommand(0, (0, 0))} )"
+                f"ap send ( 4 , {player_key} , ( {accelerateCommand(0, (1, -1))} , {shootCommand(0, (1, 1), 1) } ) )"
             ))
         if res.success == 0:
             break
