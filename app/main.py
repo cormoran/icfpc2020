@@ -167,12 +167,12 @@ def main():
         if role == 0: # attacker
             res = print_game_response(
                 interpreter.evaluate_expression(
-                    f"ap send ( 4 , {player_key} , ( {accelerateCommand(shipId, (vx, vy))} , {shootCommand(shipId, (-sx, -sy), 1) } ) )"
+                    f"ap send ( 4 , {player_key} , ( {accelerateCommand(shipId, (1, -1))} , {shootCommand(shipId, (1, 1), 1) } ) )"
                 ))
         else: # defender
             res = print_game_response(
                 interpreter.evaluate_expression(
-                    f"ap send ( 4 , {player_key} , ( {accelerateCommand(shipId, (vx, vy))} , {shootCommand(shipId, (1, 1), 1) } ) )"
+                    f"ap send ( 4 , {player_key} , ( {accelerateCommand(shipId, (1, -1))} , {shootCommand(shipId, (1, 1), 1) } ) )"
                 ))
         vx, vy = res.gameState.ship.velocity # Update velocity
 
